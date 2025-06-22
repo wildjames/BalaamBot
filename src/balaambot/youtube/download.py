@@ -94,7 +94,6 @@ async def _download_opus(
         if not cookiefile.exists():
             msg = f"Cookie file {cookiefile} does not exist"
             raise FileNotFoundError(msg)
-        ydl_opts["cookies"] = str(cookiefile)
         ydl_opts["cookiefile"] = str(cookiefile)
 
     loop = asyncio.get_event_loop()
