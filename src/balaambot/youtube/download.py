@@ -29,8 +29,7 @@ async def fetch_audio_pcm(
     url: str,
     sample_rate: int = DEFAULT_SAMPLE_RATE,
     channels: int = DEFAULT_CHANNELS,
-    username: str | None = None,
-    password: str | None = None,
+    cookiefile: Path | None = None,
 ) -> Path:
     """Audio fetching. Cache check, download via yt-dlp, then convert to PCM."""
     cache_path = get_cache_path(url, sample_rate, channels)
@@ -46,7 +45,7 @@ async def fetch_audio_pcm(
 
         try:
             await asyncio.gather(
-                _download_opus(url, opus_tmp, username=username, password=password),
+                _download_opus(url, opus_tmp, cookiefile=cookiefile),
                 metadata.get_youtube_track_metadata(url),
             )
         except DownloadError as e:
@@ -61,20 +60,15 @@ async def fetch_audio_pcm(
 
 # Helper for when running blocking download in thread
 def _sync_download(opts: dict[str, Any], target_url: str) -> None:
-    metadata.YoutubeDL(opts).download([target_url])  # type: ignore[no-typing]
+    metadata.YoutubeDL(opts).download([target_url])
 
 
 async def _download_opus(
     url: str,
     opus_tmp: Path,
-    username: str | None = None,
-    password: str | None = None,
+    cookiefile: Path | None = None,
 ) -> None:
-    """Use yt-dlp to download and extract audio as opus into ``opus_tmp``."""
-    if username or password:
-        msg = "YouTube authentication is not implemented yet."
-        raise NotImplementedError(msg)
-
+    """Use yt-dlp to download and extract audio as opus."""
     opus_tmp.parent.mkdir(parents=True, exist_ok=True)
 
     ydl_opts: dict[str, Any] = {
@@ -94,6 +88,14 @@ async def _download_opus(
         ],
         "outtmpl": str(opus_tmp.with_suffix("")),
     }
+
+    if cookiefile:
+        logger.info("Using cookie file: %s", cookiefile)
+        if not cookiefile.exists():
+            msg = f"Cookie file {cookiefile} does not exist"
+            raise FileNotFoundError(msg)
+        ydl_opts["cookies"] = str(cookiefile)
+        ydl_opts["cookiefile"] = str(cookiefile)
 
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(utils.FUTURES_EXECUTOR, _sync_download, ydl_opts, url)

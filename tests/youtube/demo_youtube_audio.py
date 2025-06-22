@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from pathlib import Path
 
 from balaambot.youtube.download import fetch_audio_pcm
 from balaambot.youtube.metadata import (
@@ -13,18 +14,17 @@ from balaambot.youtube.utils import (
 )
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 
 
 async def fetch_audio(
     test_url: str,
-    username: str | None = None,
-    password: str | None = None,
+    cookiefile: Path | None = None,
 ) -> None:
     logger.info("Testing audio fetching for URL: %s", test_url)
     # Fetch and cache audio
     t0 = asyncio.get_event_loop().time()
-    cache_path = await fetch_audio_pcm(test_url, username=username, password=password)
+    cache_path = await fetch_audio_pcm(test_url, cookiefile=cookiefile)
     t1 = asyncio.get_event_loop().time()
     logger.info("Fetched audio cache at: %s", cache_path)
     logger.info("Fetch took %.2f seconds", t1 - t0)
@@ -80,13 +80,14 @@ if __name__ == "__main__":
         test_playlist_url = "https://www.youtube.com/watch?v=Z0Uh3OJCx3o&list=PLJDafirWnxGR5H0rSeJKgxC6rIj78JKce"
         test_search_query = "Rick Astley Never Gonna Give You Up"
 
-        await fetch_audio(test_url)
-        await test_get_metadata(test_url)
-        await load_cached_audio_pcm(test_url)
-        await get_playlist(test_playlist_url)
-        await search(test_search_query)
+        # await fetch_audio(test_url)
+        # await test_get_metadata(test_url)
+        # await load_cached_audio_pcm(test_url)
+        # await get_playlist(test_playlist_url)
+        # await search(test_search_query)
 
         age_restricted_url = "https://www.youtube.com/watch?v=wiRRsHPTSC8"
-        await fetch_audio(age_restricted_url)
+        cookiefile = Path("persistent/cookies.txt")
+        await fetch_audio(age_restricted_url, cookiefile=cookiefile)
 
     asyncio.run(main())
