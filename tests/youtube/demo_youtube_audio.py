@@ -50,12 +50,6 @@ async def load_cached_audio_pcm(test_url: str) -> None:
         logger.info("Loaded %s bytes of PCM data", len(pcm_data))
         logger.info("PCM data read took %.2f seconds", t1 - t0)
 
-    await asyncio.sleep(5)
-
-    # Remove cached file
-    removed = remove_audio_pcm(test_url)
-    logger.info("Cache removed: %s", removed)
-
 async def get_playlist(playlist_url: str) -> None:
     logger.info("Fetching a playlist of URLs: %s", playlist_url)
     urls = await get_playlist_video_urls(playlist_url)
@@ -71,6 +65,13 @@ async def search(search: str) -> None:
     for result in results:
         logger.info(" - %s", result)
 
+async def cleanup(test_url: str) -> None:
+    # Remove cached audio
+    if remove_audio_pcm(test_url):
+        logger.info("Removed cached audio for URL: %s", test_url)
+    else:
+        logger.warning("No cached audio to remove for URL: %s", test_url)
+
 
 if __name__ == "__main__":
 
@@ -81,6 +82,7 @@ if __name__ == "__main__":
         await fetch_audio(test_url)
         await test_get_metadata(test_url)
         await load_cached_audio_pcm(test_url)
+        await cleanup(test_url)
 
 
         test_playlist_url = "https://www.youtube.com/watch?v=Z0Uh3OJCx3o&list=PLJDafirWnxGR5H0rSeJKgxC6rIj78JKce"
@@ -94,5 +96,7 @@ if __name__ == "__main__":
         cookiefile = Path("persistent/cookies.txt")
         config.COOKIE_FILE = cookiefile
         await fetch_audio(age_restricted_url)
+        await load_cached_audio_pcm(age_restricted_url)
+        await cleanup(age_restricted_url)
 
     asyncio.run(main())

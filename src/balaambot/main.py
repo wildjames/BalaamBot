@@ -7,8 +7,6 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 
-from balaambot.discord_utils import on_voice_state_update
-
 load_dotenv()
 
 # Discord provides a nice default coloured log format
@@ -56,6 +54,10 @@ async def load_extensions() -> None:
 
 def add_listeners() -> None:
     """Add listeners to the bot."""
+    # This needs to be imported here, since it needs the logging and bot to be set up
+    # before we can import and set up balaambot code.
+    from balaambot.discord_utils import on_voice_state_update
+
     bot.add_listener(on_voice_state_update, "on_voice_state_update")
 
     logger.info("Added listeners to the bot.")
