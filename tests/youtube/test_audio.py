@@ -4,11 +4,11 @@ from pathlib import Path
 import pytest
 from yt_dlp import DownloadError
 
-from balaambot import utils
+from balaambot import utils, config
 
-# Adjust import path if module name differs
 from balaambot.youtube import download, metadata
 import balaambot.youtube.utils as yt_utils
+
 
 pytestmark = pytest.mark.asyncio
 
@@ -176,8 +176,10 @@ async def test_metadata_cookiefile_missing(monkeypatch, tmp_path):
     monkeypatch.setattr(metadata, "cache_get_metadata", fake_cache_get)
 
     cookie = tmp_path / "no.txt"
+    monkeypatch.setattr(config, "COOKIE_FILE", cookie)
+
     with pytest.raises(FileNotFoundError):
-        await metadata.get_youtube_track_metadata("https://youtu.be/abcdefghijk", cookiefile=cookie)
+        await metadata.get_youtube_track_metadata("https://youtu.be/abcdefghijk")
 
 
 async def test_metadata_cookiefile_used(monkeypatch, tmp_path):
@@ -210,8 +212,9 @@ async def test_metadata_cookiefile_used(monkeypatch, tmp_path):
         return None
 
     monkeypatch.setattr(metadata, "cache_set_metadata", fake_cache_set)
+    monkeypatch.setattr(config, "COOKIE_FILE", cookie)
 
-    await metadata.get_youtube_track_metadata("https://youtu.be/abcdef12345", cookiefile=cookie)
+    await metadata.get_youtube_track_metadata("https://youtu.be/abcdef12345")
     assert called_opts["cookiefile"] == str(cookie)
 
 
@@ -261,10 +264,10 @@ async def test_fetch_audio_cookiefile_missing(monkeypatch, tmp_path):
     monkeypatch.setattr(metadata, "get_youtube_track_metadata", dummy_meta)
 
     missing = tmp_path / "missing.txt"
+    monkeypatch.setattr(config, "COOKIE_FILE", missing)
     with pytest.raises(FileNotFoundError):
         await download.fetch_audio_pcm(
-            "https://www.youtube.com/watch?v=ACDEF123456",
-            cookiefile=missing,
+            "https://www.youtube.com/watch?v=ACDEF123456"
         )
 
 
@@ -277,27 +280,25 @@ async def test_fetch_audio_download_error(monkeypatch, tmp_path):
 
     recorded = {}
 
-    async def fail_download(u, p, cookiefile=None):
-        recorded["cookie"] = cookiefile
+    async def fail_download(u, p):
         raise DownloadError("dl fail")
 
     monkeypatch.setattr(download, "_download_opus", fail_download)
 
-    async def dummy_meta(u, cookiefile=None):
-        recorded["meta_cookie"] = cookiefile
+    async def dummy_meta(u):
         return None
 
     monkeypatch.setattr(metadata, "get_youtube_track_metadata", dummy_meta)
     cookie = tmp_path / "cookies.txt"
     cookie.write_text("c")
+    monkeypatch.setattr(config, "COOKIE_FILE", cookie)
+
     with pytest.raises(RuntimeError) as ei:
         await download.fetch_audio_pcm(
-            "https://youtu.be/ZZZZYYYYXXX",
-            cookiefile=cookie,
+            "https://youtu.be/ZZZZYYYYXXX"
         )
+
     assert "Failed to download audio for https://youtu.be/ZZZZYYYYXXX" in str(ei.value)
-    assert recorded["cookie"] == cookie
-    assert recorded["meta_cookie"] == cookie
 
 
 async def test_fetch_audio_success(monkeypatch, tmp_path):
@@ -309,14 +310,12 @@ async def test_fetch_audio_success(monkeypatch, tmp_path):
 
     recorded = {}
 
-    async def fake_download(u, p, cookiefile=None):
-        recorded["cookie"] = cookiefile
+    async def fake_download(u, p):
         p.write_bytes(b"o")
 
     monkeypatch.setattr(download, "_download_opus", fake_download)
 
-    async def fake_meta(u, cookiefile=None):
-        recorded["meta_cookie"] = cookiefile
+    async def fake_meta(u):
         return {"url": u, "title": "t", "runtime": 1, "runtime_str": "0:01"}
 
     monkeypatch.setattr(metadata, "get_youtube_track_metadata", fake_meta)
@@ -328,10 +327,10 @@ async def test_fetch_audio_success(monkeypatch, tmp_path):
     monkeypatch.setattr(download, "_convert_opus_to_pcm", fake_convert)
     cookie = tmp_path / "cook.txt"
     cookie.write_text("c")
-    result = await download.fetch_audio_pcm("u", cookiefile=cookie)
+    monkeypatch.setattr(config, "COOKIE_FILE", cookie)
+
+    result = await download.fetch_audio_pcm("u")
     assert result == cache
-    assert recorded["cookie"] == cookie
-    assert recorded["meta_cookie"] == cookie
 
 
 # Tests for _sync_download
@@ -417,7 +416,9 @@ async def test_download_opus_cookiefile(monkeypatch, tmp_path):
 
     monkeypatch.setattr(download, "_sync_download", fake_sync_download)
     monkeypatch.setattr(download.utils, "FUTURES_EXECUTOR", None)
-    await download._download_opus(url, opus_tmp, cookiefile=cookie)
+    monkeypatch.setattr(config, "COOKIE_FILE", cookie)
+
+    await download._download_opus(url, opus_tmp)
     assert recorded.get("cookiefile") == str(cookie)
 
 
@@ -432,8 +433,10 @@ async def test_download_opus_cookiefile_missing(monkeypatch, tmp_path):
 
     monkeypatch.setattr(download, "_sync_download", fake_sync_download)
     monkeypatch.setattr(download.utils, "FUTURES_EXECUTOR", None)
+    monkeypatch.setattr(config, "COOKIE_FILE", cookie)
+
     with pytest.raises(FileNotFoundError):
-        await download._download_opus("u", opus_tmp, cookiefile=cookie)
+        await download._download_opus("u", opus_tmp)
     assert not called
 
 

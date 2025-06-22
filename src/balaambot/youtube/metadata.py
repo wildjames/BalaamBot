@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from pathlib import Path
 from typing import Any, cast
 
 from yt_dlp import DownloadError, YoutubeDL
@@ -8,6 +7,7 @@ from yt_dlp import DownloadError, YoutubeDL
 from balaambot import utils
 from balaambot.youtube.utils import (
     VideoMetadata,
+    add_auth_cookie,
     cache_get_metadata,
     cache_set_metadata,
     check_is_playlist,
@@ -18,9 +18,7 @@ from balaambot.youtube.utils import (
 logger = logging.getLogger(__name__)
 
 
-async def get_youtube_track_metadata(
-    url: str, cookiefile: Path | None = None
-) -> VideoMetadata:
+async def get_youtube_track_metadata(url: str) -> VideoMetadata:
     """Get the track metadata from a YouTube URL, caching to JSON files."""
     if not is_valid_youtube_url(url):
         msg = "Invalid YouTube URL: %s"
@@ -40,13 +38,7 @@ async def get_youtube_track_metadata(
         "skip_download": True,
         "extract_flat": True,
     }
-
-    if cookiefile:
-        logger.info("Using cookie file: %s", cookiefile)
-        if not cookiefile.exists():
-            msg = f"Cookie file {cookiefile} does not exist"
-            raise FileNotFoundError(msg)
-        ydl_opts["cookiefile"] = str(cookiefile)
+    ydl_opts = add_auth_cookie(ydl_opts)
 
     def _extract_info(opts: dict[str, Any], target_url: str) -> dict[str, Any] | None:
         with YoutubeDL(opts) as ydl:
@@ -85,6 +77,7 @@ async def get_playlist_video_urls(playlist_url: str) -> list[str]:
         "skip_download": True,
         "extract_flat": "in_playlist",
     }
+    ydl_opts = add_auth_cookie(ydl_opts)
 
     def _extract_playlist(opts: dict[str, Any], url: str) -> dict[str, Any] | None:
         with YoutubeDL(opts) as ydl:
@@ -134,6 +127,7 @@ async def search_youtube(search: str, n: int = 5) -> list[tuple[str, str, float]
         "quiet": True,
         "skip_download": True,
     }
+    ydl_opts = add_auth_cookie(ydl_opts)
 
     search = f"ytsearch{n + 2}:{search}"
 
