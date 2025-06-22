@@ -46,7 +46,7 @@ async def fetch_audio_pcm(
         try:
             await asyncio.gather(
                 _download_opus(url, opus_tmp, cookiefile=cookiefile),
-                metadata.get_youtube_track_metadata(url),
+                metadata.get_youtube_track_metadata(url, cookiefile=cookiefile),
             )
         except DownloadError as e:
             logger.exception("yt-dlp failed to download %s", url)

@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from pathlib import Path
 from typing import Any, cast
 
 from yt_dlp import DownloadError, YoutubeDL
@@ -17,7 +18,9 @@ from balaambot.youtube.utils import (
 logger = logging.getLogger(__name__)
 
 
-async def get_youtube_track_metadata(url: str) -> VideoMetadata:
+async def get_youtube_track_metadata(
+    url: str, cookiefile: Path | None = None
+) -> VideoMetadata:
     """Get the track metadata from a YouTube URL, caching to JSON files."""
     if not is_valid_youtube_url(url):
         msg = "Invalid YouTube URL: %s"
@@ -32,11 +35,18 @@ async def get_youtube_track_metadata(url: str) -> VideoMetadata:
             "No metadata in cache for URL. Fetching track metadata for URL: '%s'", url
         )
 
-    ydl_opts = {
+    ydl_opts: dict[str, Any] = {
         "quiet": True,
         "skip_download": True,
         "extract_flat": True,
     }
+
+    if cookiefile:
+        logger.info("Using cookie file: %s", cookiefile)
+        if not cookiefile.exists():
+            msg = f"Cookie file {cookiefile} does not exist"
+            raise FileNotFoundError(msg)
+        ydl_opts["cookiefile"] = str(cookiefile)
 
     def _extract_info(opts: dict[str, Any], target_url: str) -> dict[str, Any] | None:
         with YoutubeDL(opts) as ydl:
