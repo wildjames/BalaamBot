@@ -13,6 +13,7 @@ from balaambot.youtube.utils import (
     DEFAULT_CHANNELS,
     DEFAULT_SAMPLE_RATE,
     VideoMetadata,
+    add_auth_cookie,
     cache_get_metadata,
     cache_set_metadata,
     get_cache_path,
@@ -26,11 +27,7 @@ _download_locks: dict[str, asyncio.Lock] = {}
 
 
 async def fetch_audio_pcm(
-    url: str,
-    sample_rate: int = DEFAULT_SAMPLE_RATE,
-    channels: int = DEFAULT_CHANNELS,
-    username: str | None = None,
-    password: str | None = None,
+    url: str, sample_rate: int = DEFAULT_SAMPLE_RATE, channels: int = DEFAULT_CHANNELS
 ) -> Path:
     """Audio fetching. Cache check, download via yt-dlp, then convert to PCM."""
     cache_path = get_cache_path(url, sample_rate, channels)
@@ -46,7 +43,7 @@ async def fetch_audio_pcm(
 
         try:
             await asyncio.gather(
-                _download_opus(url, opus_tmp, username=username, password=password),
+                _download_opus(url, opus_tmp),
                 metadata.get_youtube_track_metadata(url),
             )
         except DownloadError as e:
@@ -61,20 +58,14 @@ async def fetch_audio_pcm(
 
 # Helper for when running blocking download in thread
 def _sync_download(opts: dict[str, Any], target_url: str) -> None:
-    metadata.YoutubeDL(opts).download([target_url])  # type: ignore[no-typing]
+    metadata.YoutubeDL(opts).download([target_url])
 
 
 async def _download_opus(
     url: str,
     opus_tmp: Path,
-    username: str | None = None,
-    password: str | None = None,
 ) -> None:
-    """Use yt-dlp to download and extract audio as opus into ``opus_tmp``."""
-    if username or password:
-        msg = "YouTube authentication is not implemented yet."
-        raise NotImplementedError(msg)
-
+    """Use yt-dlp to download and extract audio as opus."""
     opus_tmp.parent.mkdir(parents=True, exist_ok=True)
 
     ydl_opts: dict[str, Any] = {
@@ -94,6 +85,7 @@ async def _download_opus(
         ],
         "outtmpl": str(opus_tmp.with_suffix("")),
     }
+    ydl_opts = add_auth_cookie(ydl_opts)
 
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(utils.FUTURES_EXECUTOR, _sync_download, ydl_opts, url)
@@ -172,6 +164,7 @@ def download_and_convert(  # noqa: PLR0913
         "postprocessors": [{"key": "FFmpegExtractAudio", "preferredcodec": "opus"}],
         "outtmpl": str(outtmpl),
     }
+    ydl_opts = add_auth_cookie(ydl_opts)
 
     with YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
@@ -221,11 +214,12 @@ def get_metadata(logger: logging.Logger, url: str) -> VideoMetadata:
             "No metadata in cache for URL. Fetching track metadata for URL: '%s'", url
         )
 
-    ydl_opts = {
+    ydl_opts: dict[str, Any] = {
         "quiet": True,
         "skip_download": True,
         "extract_flat": True,
     }
+    ydl_opts = add_auth_cookie(ydl_opts)
 
     logger.info("Fetching metadata for %s", url)
     with YoutubeDL(ydl_opts) as ydl:

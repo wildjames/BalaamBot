@@ -6,7 +6,7 @@ import urllib.parse
 from pathlib import Path
 from typing import Any, TypedDict, cast
 
-import balaambot.config
+from balaambot import config
 from balaambot.utils import get_cache, sec_to_string, set_cache
 
 logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ logger.info(
     DEFAULT_CHANNELS,
 )
 
-AUDIO_CACHE_ROOT = Path(balaambot.config.PERSISTENT_DATA_DIR) / "audio_cache"
+AUDIO_CACHE_ROOT = Path(config.PERSISTENT_DATA_DIR) / "audio_cache"
 logger.info("Using audio download and caching directory: '%s'", AUDIO_CACHE_ROOT)
 
 # Directory for caching PCM audio files
@@ -243,3 +243,15 @@ def check_is_playlist(url: str) -> bool:
 
     # 'list' will be a key if there's a playlist ID in the URL
     return bool(params.get("list", False))
+
+
+def add_auth_cookie(ydl_opts: dict[str, Any]) -> dict[str, Any]:
+    """Add the cookie file to the yt-dlp options if it exists."""
+    if config.COOKIE_FILE:
+        if not config.COOKIE_FILE.exists():
+            msg = f"Cookie file '{config.COOKIE_FILE}' does not exist."
+            raise FileNotFoundError(msg)
+        logger.info("Using cookie file: %s", config.COOKIE_FILE)
+        ydl_opts["cookiefile"] = str(config.COOKIE_FILE)
+
+    return ydl_opts

@@ -4,11 +4,11 @@ from pathlib import Path
 import pytest
 from yt_dlp import DownloadError
 
-from balaambot import utils
+from balaambot import utils, config
 
-# Adjust import path if module name differs
 from balaambot.youtube import download, metadata
 import balaambot.youtube.utils as yt_utils
+
 
 pytestmark = pytest.mark.asyncio
 
@@ -167,6 +167,57 @@ async def test_metadata_defaults(monkeypatch):
     assert stored["u"] == result
 
 
+async def test_metadata_cookiefile_missing(monkeypatch, tmp_path):
+    monkeypatch.setattr(metadata, "is_valid_youtube_url", lambda url: True)
+
+    async def fake_cache_get(url):
+        raise KeyError(url)
+
+    monkeypatch.setattr(metadata, "cache_get_metadata", fake_cache_get)
+
+    cookie = tmp_path / "no.txt"
+    monkeypatch.setattr(config, "COOKIE_FILE", cookie)
+
+    with pytest.raises(FileNotFoundError):
+        await metadata.get_youtube_track_metadata("https://youtu.be/abcdefghijk")
+
+
+async def test_metadata_cookiefile_used(monkeypatch, tmp_path):
+    monkeypatch.setattr(metadata, "is_valid_youtube_url", lambda url: True)
+
+    async def fake_cache_get(url):
+        raise KeyError(url)
+
+    monkeypatch.setattr(metadata, "cache_get_metadata", fake_cache_get)
+    monkeypatch.setattr(utils, "sec_to_string", lambda s: "0:01")
+    cookie = tmp_path / "cookies.txt"
+    cookie.write_text("data")
+    called_opts = {}
+
+    class DummyYDL:
+        def __init__(self, opts):
+            called_opts.update(opts)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            return False
+
+        def extract_info(self, url, download):
+            return {"title": "T", "duration": 1}
+
+    monkeypatch.setattr(metadata, "YoutubeDL", lambda opts: DummyYDL(opts))
+    async def fake_cache_set(meta):
+        return None
+
+    monkeypatch.setattr(metadata, "cache_set_metadata", fake_cache_set)
+    monkeypatch.setattr(config, "COOKIE_FILE", cookie)
+
+    await metadata.get_youtube_track_metadata("https://youtu.be/abcdef12345")
+    assert called_opts["cookiefile"] == str(cookie)
+
+
 # Tests for cache_get_metadata
 async def test_cache_get_metadata_success(monkeypatch):
     data = {"url": "u", "title": "t", "runtime": 1, "runtime_str": "0:01"}
@@ -202,15 +253,21 @@ async def test_fetch_audio_cache_hit(monkeypatch, tmp_path):
     assert result == cache
 
 
-async def test_fetch_audio_auth(monkeypatch):
+async def test_fetch_audio_cookiefile_missing(monkeypatch, tmp_path):
     monkeypatch.setattr(
         download, "get_cache_path", lambda u, sr, ch: Path("/tmp/nonexistent")
     )
-    with pytest.raises(NotImplementedError):
+
+    async def dummy_meta(u, cookiefile=None):
+        return None
+
+    monkeypatch.setattr(metadata, "get_youtube_track_metadata", dummy_meta)
+
+    missing = tmp_path / "missing.txt"
+    monkeypatch.setattr(config, "COOKIE_FILE", missing)
+    with pytest.raises(FileNotFoundError):
         await download.fetch_audio_pcm(
-            "https://www.youtube.com/watch?v=ACDEF123456",
-            username="user",
-            password="pass",
+            "https://www.youtube.com/watch?v=ACDEF123456"
         )
 
 
@@ -221,7 +278,9 @@ async def test_fetch_audio_download_error(monkeypatch, tmp_path):
         download, "get_temp_paths", lambda u: (tmp_path / "a.opus", tmp_path / "b.pcm")
     )
 
-    async def fail_download(u, p, username=None, password=None):
+    recorded = {}
+
+    async def fail_download(u, p):
         raise DownloadError("dl fail")
 
     monkeypatch.setattr(download, "_download_opus", fail_download)
@@ -230,10 +289,15 @@ async def test_fetch_audio_download_error(monkeypatch, tmp_path):
         return None
 
     monkeypatch.setattr(metadata, "get_youtube_track_metadata", dummy_meta)
+    cookie = tmp_path / "cookies.txt"
+    cookie.write_text("c")
+    monkeypatch.setattr(config, "COOKIE_FILE", cookie)
+
     with pytest.raises(RuntimeError) as ei:
         await download.fetch_audio_pcm(
             "https://youtu.be/ZZZZYYYYXXX"
         )
+
     assert "Failed to download audio for https://youtu.be/ZZZZYYYYXXX" in str(ei.value)
 
 
@@ -244,7 +308,9 @@ async def test_fetch_audio_success(monkeypatch, tmp_path):
     monkeypatch.setattr(download, "get_cache_path", lambda u, sr, ch: cache)
     monkeypatch.setattr(download, "get_temp_paths", lambda u: (opus_tmp, pcm_tmp))
 
-    async def fake_download(u, p, username=None, password=None):
+    recorded = {}
+
+    async def fake_download(u, p):
         p.write_bytes(b"o")
 
     monkeypatch.setattr(download, "_download_opus", fake_download)
@@ -259,6 +325,10 @@ async def test_fetch_audio_success(monkeypatch, tmp_path):
         p.replace(c)
 
     monkeypatch.setattr(download, "_convert_opus_to_pcm", fake_convert)
+    cookie = tmp_path / "cook.txt"
+    cookie.write_text("c")
+    monkeypatch.setattr(config, "COOKIE_FILE", cookie)
+
     result = await download.fetch_audio_pcm("u")
     assert result == cache
 
@@ -328,6 +398,46 @@ async def test_download_opus_success(monkeypatch, tmp_path):
     monkeypatch.setattr(download.utils, "FUTURES_EXECUTOR", None)
     await download._download_opus(url, opus_tmp)
     assert opus_tmp.exists() and opus_tmp.read_bytes() == b"dummy"
+
+
+async def test_download_opus_cookiefile(monkeypatch, tmp_path):
+    url = "u"
+    opus_tmp = tmp_path / "file"
+    cookie = tmp_path / "cookies.txt"
+    cookie.write_text("c")
+
+    recorded = {}
+
+    def fake_sync_download(opts, target_url):
+        recorded.update(opts)
+        path = Path(f"{opts['outtmpl']}.opus")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"data")
+
+    monkeypatch.setattr(download, "_sync_download", fake_sync_download)
+    monkeypatch.setattr(download.utils, "FUTURES_EXECUTOR", None)
+    monkeypatch.setattr(config, "COOKIE_FILE", cookie)
+
+    await download._download_opus(url, opus_tmp)
+    assert recorded.get("cookiefile") == str(cookie)
+
+
+async def test_download_opus_cookiefile_missing(monkeypatch, tmp_path):
+    opus_tmp = tmp_path / "file"
+    cookie = tmp_path / "missing.txt"
+    called = False
+
+    def fake_sync_download(*args, **kwargs):
+        nonlocal called
+        called = True
+
+    monkeypatch.setattr(download, "_sync_download", fake_sync_download)
+    monkeypatch.setattr(download.utils, "FUTURES_EXECUTOR", None)
+    monkeypatch.setattr(config, "COOKIE_FILE", cookie)
+
+    with pytest.raises(FileNotFoundError):
+        await download._download_opus("u", opus_tmp)
+    assert not called
 
 
 # Tests for _convert_opus_to_pcm

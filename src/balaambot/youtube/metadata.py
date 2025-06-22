@@ -7,6 +7,7 @@ from yt_dlp import DownloadError, YoutubeDL
 from balaambot import utils
 from balaambot.youtube.utils import (
     VideoMetadata,
+    add_auth_cookie,
     cache_get_metadata,
     cache_set_metadata,
     check_is_playlist,
@@ -32,11 +33,12 @@ async def get_youtube_track_metadata(url: str) -> VideoMetadata:
             "No metadata in cache for URL. Fetching track metadata for URL: '%s'", url
         )
 
-    ydl_opts = {
+    ydl_opts: dict[str, Any] = {
         "quiet": True,
         "skip_download": True,
         "extract_flat": True,
     }
+    ydl_opts = add_auth_cookie(ydl_opts)
 
     def _extract_info(opts: dict[str, Any], target_url: str) -> dict[str, Any] | None:
         with YoutubeDL(opts) as ydl:
@@ -75,6 +77,7 @@ async def get_playlist_video_urls(playlist_url: str) -> list[str]:
         "skip_download": True,
         "extract_flat": "in_playlist",
     }
+    ydl_opts = add_auth_cookie(ydl_opts)
 
     def _extract_playlist(opts: dict[str, Any], url: str) -> dict[str, Any] | None:
         with YoutubeDL(opts) as ydl:
@@ -124,6 +127,7 @@ async def search_youtube(search: str, n: int = 5) -> list[tuple[str, str, float]
         "quiet": True,
         "skip_download": True,
     }
+    ydl_opts = add_auth_cookie(ydl_opts)
 
     search = f"ytsearch{n + 2}:{search}"
 

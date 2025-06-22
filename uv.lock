@@ -248,7 +248,7 @@ requires-dist = [
     { name = "pytest-asyncio", specifier = ">=1.0.0" },
     { name = "pytest-cov", specifier = ">=6.1.1" },
     { name = "redis", specifier = ">=6.2.0" },
-    { name = "yt-dlp", specifier = ">=2025.5.22" },
+    { name = "yt-dlp", specifier = ">=2025.6.9" },
 ]
 
 [package.metadata.requires-dev]
