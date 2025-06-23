@@ -82,7 +82,8 @@ def test_read_clips_and_respects_stopped(monkeypatch):
     assert silence == b""
 
 
-def test_play_file_success(monkeypatch, tmp_path):
+@pytest.mark.asyncio
+async def test_play_file_success(monkeypatch, tmp_path):
     vc = MockVoiceChat()
     src = MultiAudioSource(vc)
     src.CHUNK_SIZE = 2
@@ -94,15 +95,17 @@ def test_play_file_success(monkeypatch, tmp_path):
     # Stub ffmpeg detection
     monkeypatch.setattr(shutil, "which", lambda name: "ffmpeg")
 
-    # Stub subprocess.Popen
-    class DummyPopen:
-        def __init__(self, args, stdout, stderr):
+    class DummyProcess:
+        def __init__(self):
             self.returncode = 0
 
-        def communicate(self):
+        async def communicate(self):
             return (b"\x01\x00\x02\x00", b"")
 
-    monkeypatch.setattr(subprocess, "Popen", DummyPopen)
+    async def fake_exec(*args, **kwargs):
+        return DummyProcess()
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_exec)
 
     # Patch create_task on vc.loop to record scheduling of functions
     scheduled = []
@@ -116,7 +119,7 @@ def test_play_file_success(monkeypatch, tmp_path):
     def after_play():
         pass
 
-    src.play_file(str(dummy), before_play=before_play, after_play=after_play)
+    await src.play_file(str(dummy), before_play=before_play, after_play=after_play)
 
     # One track enqueued
     assert len(src._sfx) == 1
@@ -141,22 +144,24 @@ def test_play_file_success(monkeypatch, tmp_path):
     assert len(scheduled) == 2
 
 
-def test_play_file_ffmpeg_not_found(monkeypatch, tmp_path):
+@pytest.mark.asyncio
+async def test_play_file_ffmpeg_not_found(monkeypatch, tmp_path):
     vc = MockVoiceChat()
     src = MultiAudioSource(vc)
     dummy = tmp_path / "dummy.wav"
     dummy.write_bytes(b"")
     monkeypatch.setattr(shutil, "which", lambda name: None)
     with pytest.raises(RuntimeError) as exc:
-        src.play_file(str(dummy))
+        await src.play_file(str(dummy))
     assert "ffmpeg not found" in str(exc.value)
 
 
-def test_play_file_file_not_found():
+@pytest.mark.asyncio
+async def test_play_file_file_not_found():
     vc = MockVoiceChat()
     src = MultiAudioSource(vc)
     with pytest.raises(FileNotFoundError):
-        src.play_file("nonexistent.wav")
+        await src.play_file("nonexistent.wav")
 
 
 @pytest.mark.asyncio
