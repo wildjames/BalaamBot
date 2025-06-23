@@ -139,7 +139,7 @@ class SFXCommands(commands.Cog):
         vc = await discord_utils.ensure_connected(guild, channel)
         mixer = await discord_utils.get_mixer_from_interaction(interaction)
 
-        mixer.play_file(sound)
+        await mixer.play_file(sound)
         if not vc.is_playing():
             vc.play(mixer)
         await interaction.followup.send(
@@ -173,7 +173,7 @@ class SFXCommands(commands.Cog):
         mixer = await discord_utils.get_mixer_from_interaction(interaction)
 
         try:
-            mixer.play_file(sound)
+            await mixer.play_file(sound)
             if not vc.is_playing():
                 vc.play(mixer)
 

@@ -2,7 +2,6 @@ import array
 import asyncio
 import logging
 import shutil
-import subprocess
 import threading
 import uuid
 from collections.abc import Callable
@@ -386,7 +385,7 @@ class MultiAudioSource(AudioSource):
         logger.info("Now %d tracks in mixer", len(self._tracks))
         self.resume()
 
-    def play_file(
+    async def play_file(
         self,
         filename: str,
         before_play: Callable[[], None] | None = None,
@@ -418,26 +417,24 @@ class MultiAudioSource(AudioSource):
             msg = "ffmpeg not found in PATH"
             raise RuntimeError(msg)
 
-        proc = subprocess.Popen(  # noqa: S603 We're safe here
-            [
-                ffmpeg_path,
-                "-v",
-                "quiet",
-                "-i",
-                filename,
-                "-f",
-                "s16le",
-                "-ar",
-                str(self.SAMPLE_RATE),
-                "-ac",
-                str(self.CHANNELS),
-                "pipe:1",
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+        proc = await asyncio.create_subprocess_exec(
+            ffmpeg_path,
+            "-v",
+            "quiet",
+            "-i",
+            filename,
+            "-f",
+            "s16le",
+            "-ar",
+            str(self.SAMPLE_RATE),
+            "-ac",
+            str(self.CHANNELS),
+            "pipe:1",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
         )
 
-        pcm_data, err = proc.communicate()
+        pcm_data, err = await proc.communicate()
         if proc.returncode != 0:
             msg = f"ffmpeg failed: {err.decode(errors='ignore')}"
             raise RuntimeError(msg)

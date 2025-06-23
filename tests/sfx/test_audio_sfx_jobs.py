@@ -158,7 +158,7 @@ async def test_play_sfx_loop_success_one_iteration(monkeypatch):
         def __init__(self):
             self.played = []
 
-        def play_file(self, sound, after_play=None):
+        async def play_file(self, sound, after_play=None):
             # simulate immediate playback
             if after_play:
                 after_play()
@@ -183,9 +183,9 @@ async def test_play_sfx_loop_success_one_iteration(monkeypatch):
     # To exit after one iteration, remove job within after_play
     original_after = dummy_mixer.play_file
 
-    def wrapped_play_file(sound, after_play=None):
+    async def wrapped_play_file(sound, after_play=None):
         # call original then schedule removal
-        original_after(sound, after_play)
+        await original_after(sound, after_play)
         # remove job to break loop
         asyncio.get_event_loop().create_task(sfx.remove_job(job_id))
 
