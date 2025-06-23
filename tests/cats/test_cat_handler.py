@@ -238,3 +238,45 @@ def test_decrease_hunger(patch_save_file, patch_logger):
     handler.decrease_hunger()
     # Should not go below 0
     assert handler.db.guild_cats[GUILD_ID][handler._get_cat_id("Kitty")].hunger == 0
+
+def test_get_hungry_cats(patch_save_file, patch_logger):
+    handler = CatHandler()
+    # No cats at all
+    assert handler.get_hungry_cats() == []
+
+    # Add cats with different owners and hunger levels
+    handler.add_cat("HungryCat", GUILD_ID, 1)
+    handler.add_cat("FullCat", GUILD_ID, 2)
+    handler.add_cat("BorderlineCat", GUILD_ID, 3)
+    # Set hunger values
+    handler.db.guild_cats[GUILD_ID][handler._get_cat_id("HungryCat")].hunger = 5
+    handler.db.guild_cats[GUILD_ID][handler._get_cat_id("FullCat")].hunger = 50
+    handler.db.guild_cats[GUILD_ID][handler._get_cat_id("BorderlineCat")].hunger = 10
+
+    # Default threshold is 10 (strictly less than 10)
+    result = handler.get_hungry_cats()
+    assert 1 in result
+    assert 2 not in result
+    assert 3 not in result
+    assert len(result) == 1
+
+    # Test with a higher threshold
+    result = handler.get_hungry_cats(threshold=11)
+    assert 1 in result
+    assert 3 in result
+    assert 2 not in result
+    assert set(result) == {1, 3}
+
+    # Test with a threshold that includes all
+    result = handler.get_hungry_cats(threshold=100)
+    assert set(result) == {1, 2, 3}
+
+    # Test with a threshold that includes none
+    result = handler.get_hungry_cats(threshold=0)
+    assert result == []
+
+    # Test duplicate owners (multiple hungry cats for one owner)
+    handler.add_cat("AnotherHungry", GUILD_ID, 1)
+    handler.db.guild_cats[GUILD_ID][handler._get_cat_id("AnotherHungry")].hunger = 2
+    result = handler.get_hungry_cats(threshold=10)
+    assert result.count(1) == 1  # Should only appear once
