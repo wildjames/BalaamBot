@@ -8,17 +8,21 @@ import balaambot.config
 logger = logging.getLogger(__name__)
 
 SAVE_FILE = pathlib.Path(balaambot.config.PERSISTENT_DATA_DIR) / "cats.json"
+MAX_CAT_HUNGER = 100
+CAT_FEED_THRESHOLD = 90
+
 
 # TODOs:
-# fuzzy search for cat names (try pkg: the fuzz)
-# move message strings to separate file (cat_commands_strings.py?)
-
-
+# fuzzy search for cat names (try pkg: rapidfuzz)
 class Cat(pydantic.BaseModel):
     """Data representing a cat."""
 
+    # Cat name, used as the unique identifier
     name: str
-    owner: int  # Discord user ID of the owner
+    # Discord user ID of the owner
+    owner: int
+    # Hunger level
+    hunger: int = 100
 
 
 class CatData(pydantic.BaseModel):
@@ -65,9 +69,9 @@ class CatHandler:
         return cat.name if cat else None
 
     def get_cat_names(self, guild_id: int) -> str:
-        """Get a formatted list of cat names and owners."""
+        """Get a formatted list of cat names, owners, and hunger levels."""
         return "\n".join(
-            f"- {cat.name} (Owner: <@{cat.owner}>)"
+            f"- {cat.name} (Owner: <@{cat.owner}>, Hunger: {cat.hunger})"
             for cat in self.db.guild_cats.get(guild_id, {}).values()
         )
 
@@ -122,6 +126,50 @@ class CatHandler:
                 "Goodbye! :crying_cat_face:"
             ),
         )
+
+    def feed_cat(self, cat_name: str, guild_id: int, user_id: int) -> str:
+        """Feed a cat to increase its hunger level.
+
+        Args:
+            cat_name (str): The name of the cat to feed
+            guild_id (int): The Discord guild the cat is in
+            user_id (int): The Discord user ID of the user feeding the cat
+
+        Returns:
+            str: The result message
+
+        """
+        cat_id = self._get_cat_id(cat_name)
+        cats = self.db.guild_cats.get(guild_id, {})
+        cat_obj = cats.get(cat_id)
+        if not cat_obj:
+            return f"No cat named {cat_name} exists."
+        if cat_obj.owner != user_id:
+            return (
+                f"You are not the owner of {cat_obj.name}! "
+                "Only the owner can feed this cat. :pouting_cat:"
+            )
+
+        old_hunger = cat_obj.hunger
+        if cat_obj.hunger > CAT_FEED_THRESHOLD:
+            return (
+                f"{cat_obj.name} doesn't want to eat right now. "
+                "They are not hungry enough. :smiley_cat:"
+            )
+        cat_obj.hunger = MAX_CAT_HUNGER
+        self._save_cat_db(self.db)
+        return (
+            f"<@{user_id}> fed {cat_obj.name}! "
+            f"Hunger: {old_hunger} → {cat_obj.hunger} :kissing_cat:"
+        )
+
+    def decrease_hunger(self) -> None:
+        """Decrease the hunger of all cats by 1."""
+        for cats in self.db.guild_cats.values():
+            for cat in cats.values():
+                # Decrease hunger by 1, but not below 0
+                if cat.hunger > 0:
+                    cat.hunger -= 1
 
     def _get_cat_id(self, cat_name: str) -> str:
         return cat_name.strip().lower()
