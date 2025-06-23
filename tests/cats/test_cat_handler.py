@@ -79,6 +79,22 @@ def test_add_cat_normalizes_id(patch_save_file, patch_logger):
     cat_obj = handler.db.guild_cats[GUILD_ID]["fluffy"]
     assert cat_obj.owner == owner_id
 
+def test_get_cat_names_with_hunger(patch_save_file, patch_logger):
+    handler = CatHandler()
+    owner1 = 1
+    owner2 = 2
+    handler.add_cat("A", GUILD_ID, owner1)
+    handler.add_cat("B", GUILD_ID, owner2)
+    # Set custom hunger values
+    handler.db.guild_cats[GUILD_ID][handler._get_cat_id("A")].hunger = 50
+    handler.db.guild_cats[GUILD_ID][handler._get_cat_id("B")].hunger = 75
+    names = handler.get_cat_names(GUILD_ID)
+    assert f"- A (Owner: <@{owner1}>, Hunger: 50)" in names
+    assert f"- B (Owner: <@{owner2}>, Hunger: 75)" in names
+    assert names.count("- ") == 2
+
+# Update the broken test to match the new output format
+
 def test_get_cat_names(patch_save_file, patch_logger):
     handler = CatHandler()
     owner1 = 1
@@ -86,8 +102,8 @@ def test_get_cat_names(patch_save_file, patch_logger):
     handler.add_cat("A", GUILD_ID, owner1)
     handler.add_cat("B", GUILD_ID, owner2)
     names = handler.get_cat_names(GUILD_ID)
-    assert f"- A (Owner: <@{owner1}>)" in names
-    assert f"- B (Owner: <@{owner2}>)" in names
+    assert f"- A (Owner: <@{owner1}>, Hunger: 100)" in names
+    assert f"- B (Owner: <@{owner2}>, Hunger: 100)" in names
     assert names.count("- ") == 2
 
 def test_get_num_cats(patch_save_file, patch_logger):
@@ -182,3 +198,43 @@ def test_remove_cat_not_exist(patch_save_file, patch_logger):
     success, msg = handler.remove_cat("Ghost", GUILD_ID, 123)
     assert success is False
     assert "No cat named Ghost exists" in msg
+
+def test_feed_cat_no_cat(patch_save_file, patch_logger):
+    handler = CatHandler()
+    result = handler.feed_cat("Ghost", GUILD_ID, 1)
+    assert "No cat named Ghost exists" in result
+
+def test_feed_cat_not_owner(patch_save_file, patch_logger):
+    handler = CatHandler()
+    handler.add_cat("Kitty", GUILD_ID, 1)
+    result = handler.feed_cat("Kitty", GUILD_ID, 2)
+    assert "not the owner" in result
+
+def test_feed_cat_not_hungry(patch_save_file, patch_logger):
+    handler = CatHandler()
+    handler.add_cat("Kitty", GUILD_ID, 1)
+    # Set hunger above threshold
+    handler.db.guild_cats[GUILD_ID][handler._get_cat_id("Kitty")].hunger = 95
+    result = handler.feed_cat("Kitty", GUILD_ID, 1)
+    assert "doesn't want to eat" in result
+
+def test_feed_cat_success(patch_save_file, patch_logger):
+    handler = CatHandler()
+    handler.add_cat("Kitty", GUILD_ID, 1)
+    # Set hunger below threshold
+    handler.db.guild_cats[GUILD_ID][handler._get_cat_id("Kitty")].hunger = 50
+    result = handler.feed_cat("Kitty", GUILD_ID, 1)
+    assert "fed Kitty" in result
+    assert "50 → 100" in result
+
+def test_decrease_hunger(patch_save_file, patch_logger):
+    handler = CatHandler()
+    handler.add_cat("Kitty", GUILD_ID, 1)
+    handler.db.guild_cats[GUILD_ID][handler._get_cat_id("Kitty")].hunger = 2
+    handler.decrease_hunger()
+    assert handler.db.guild_cats[GUILD_ID][handler._get_cat_id("Kitty")].hunger == 1
+    handler.decrease_hunger()
+    assert handler.db.guild_cats[GUILD_ID][handler._get_cat_id("Kitty")].hunger == 0
+    handler.decrease_hunger()
+    # Should not go below 0
+    assert handler.db.guild_cats[GUILD_ID][handler._get_cat_id("Kitty")].hunger == 0
