@@ -140,3 +140,21 @@ def test_get_audio_pcm_and_remove(tmp_cache_root):
     assert not pcm_path.exists()
     # Removing again
     assert not mod.remove_audio_pcm(url)
+
+
+def test_add_auth_cookie_adds_cookie(tmp_path, monkeypatch):
+    import balaambot.youtube.utils as utils
+    import balaambot.config as config
+    # Create a dummy cookie file
+    cookie_file = tmp_path / "cookie.txt"
+    cookie_file.write_text("cookie-data")
+    ydl_opts = {}
+    monkeypatch.setattr(config, "COOKIE_FILE", cookie_file)
+    out = utils.add_auth_cookie(ydl_opts)
+    assert "cookiefile" in out and out["cookiefile"] == str(cookie_file)
+
+
+def test_check_is_playlist():
+    from balaambot.youtube.utils import check_is_playlist
+    assert check_is_playlist("https://www.youtube.com/playlist?list=PL123")
+    assert not check_is_playlist("https://youtu.be/abcdEFGHijk")
