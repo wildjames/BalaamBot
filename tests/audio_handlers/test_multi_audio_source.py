@@ -367,3 +367,52 @@ def test_stop_sfx_and_stop_tracks_and_stop():
     src2 = MultiAudioSource(vc2)
     src2.clear_queue()
     assert calls == ["sfx", "tracks"]
+
+
+def test_compute_normalisation_factor_max(monkeypatch):
+    vc = MockVoiceChat()
+    src = MultiAudioSource(vc)
+    src.NORMALISATION_APPROACH = "max"
+    src.TARGET_VOLUME = 1.0
+    src.MAX_VOLUME = 1.0
+    samples = [1, -2, 3, -4]
+    track = {"id": "tid", "samples": samples, "name": "t"}
+    src._track_norm_factors = {}
+    src._compute_normalisation_factor(track)
+    # Should use max(abs(samples))
+    assert "tid" in src._track_norm_factors
+
+
+def test_compute_normalisation_factor_std_dev(monkeypatch):
+    vc = MockVoiceChat()
+    src = MultiAudioSource(vc)
+    src.NORMALISATION_APPROACH = "std_dev"
+    src.TARGET_VOLUME = 1.0
+    src.MAX_VOLUME = 1.0
+    samples = [1, 2, 3, 4]
+    track = {"id": "tid2", "samples": samples, "name": "t2"}
+    src._track_norm_factors = {}
+    src._compute_normalisation_factor(track)
+    assert "tid2" in src._track_norm_factors
+
+
+def test_handle_callback_before_and_after(monkeypatch):
+    vc = MockVoiceChat()
+    src = MultiAudioSource(vc)
+    called = {}
+    def before(): called["before"] = True
+    def after(): called["after"] = True
+    track = {"before_play": before, "after_play": after, "name": "t"}
+    # Patch asyncio.to_thread to call the function immediately
+    monkeypatch.setattr("asyncio.to_thread", lambda func: func())
+    monkeypatch.setattr(vc.loop, "create_task", lambda coro: coro)
+    src.handle_callback(track, "before_play")
+    src.handle_callback(track, "after_play")
+    assert "before" in called and "after" in called
+
+def test_handle_callback_invalid_which():
+    vc = MockVoiceChat()
+    src = MultiAudioSource(vc)
+    track = {"before_play": None, "after_play": None, "name": "t"}
+    with pytest.raises(ValueError):
+        src.handle_callback(track, "not_a_valid_type")

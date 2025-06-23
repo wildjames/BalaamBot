@@ -14,6 +14,8 @@ from balaambot.utils import sec_to_string, get_cache, set_cache, memory_cache
         (65, "01:05"),
         (3600, "01:00:00"),
         (3665, "01:01:05"),
+        (100000, "27:46:40"),
+        (-5, "-00:05"),
     ],
 )
 def test_sec_to_string(seconds, expected):
