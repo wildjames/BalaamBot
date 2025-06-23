@@ -112,7 +112,6 @@ class MusicCommands(commands.Cog):
                 interaction.guild_id,
             )
 
-
     async def do_search_youtube(
         self, interaction: discord.Interaction, query: str
     ) -> None:
