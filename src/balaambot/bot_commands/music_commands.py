@@ -87,29 +87,31 @@ class MusicCommands(commands.Cog):
         if yt_utils.is_valid_youtube_playlist(query):
             logger.info("Received play command for playlist URL: '%s'", query)
             self.bot.loop.create_task(self.do_play_playlist(interaction, query))
-            return
 
         # Handle youtube videos
-        if yt_utils.is_valid_youtube_url(query):
+        elif yt_utils.is_valid_youtube_url(query):
             logger.info("Received play command for URL: '%s'", query)
             self.bot.loop.create_task(self.do_play(interaction, query))
-            return
 
         # Fall back to searching youtube and asking the user to select a search result
-        if query:
+        elif query:
             logger.info("Received a string. Searching youtube for videos. '%s'", query)
             self.bot.loop.create_task(self.do_search_youtube(interaction, query))
-            return
 
-        # Failed to do anything. I think this is only reached if the query is empty?
-        await interaction.followup.send(
-            content=(
-                "Invalid play command. Please provide a valid youtube video "
-                "or playlist link, or a searchable string."
-            ),
-            ephemeral=True,
-        )
-        return
+        else:
+            # Failed to do anything. I think this is only reached if the query is empty?
+            await interaction.followup.send(
+                content=(
+                    "Invalid play command. Please provide a valid youtube video "
+                    "or playlist link, or a searchable string."
+                ),
+                ephemeral=True,
+            )
+            logger.warning(
+                "Received an empty query for play command in guild_id=%s",
+                interaction.guild_id,
+            )
+
 
     async def do_search_youtube(
         self, interaction: discord.Interaction, query: str

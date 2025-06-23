@@ -190,10 +190,8 @@ async def _play_next(
             after_play=_after_play,
         )
 
-        # After transmitting silence, discord stops calling the read() method.
-        # So, we need to call the play method again to get it going again.
-        if not vc.is_playing():
-            vc.play(mixer)
+        mixer.resume()
+        vc.play(mixer)
 
         await _maybe_preload_next_tracks(vc, queue)
     except Exception:
