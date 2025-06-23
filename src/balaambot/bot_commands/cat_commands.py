@@ -5,15 +5,16 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from balaambot.cats.cat_handler import CatHandler
+from balaambot.cats.cat_handler import MAX_CAT_HUNGER, CatHandler
 
 MSG_NO_CAT = (
     "You don't have any cats yet! :crying_cat_face: Try adopting one with `/adopt`!"
 )
-MAX_HUNGER = 100
 CAT_FEEDS_PER_DAY = 1
 # Calculate how often to decrease hunger based on feeds per day
-HUNGER_LOOP_TIME = (CAT_FEEDS_PER_DAY * 24 * 60 * 60) / MAX_HUNGER
+HUNGER_LOOP_TIME = (CAT_FEEDS_PER_DAY * 24 * 60 * 60) / MAX_CAT_HUNGER
+# Hunger level at which to notify users
+NOTIFICATION_THRESHOLD = 10
 
 logger = logging.getLogger(__name__)
 
@@ -26,15 +27,36 @@ class CatCommands(commands.Cog):
         self.bot = bot
         self.cat_handler = CatHandler()
         self.hunger_task.start()
+        self.feed_notify_task.start()
 
     def cog_unload(self) -> None:
         """Stop the hunger task when the cog is unloaded."""
         self.hunger_task.cancel()
+        self.feed_notify_task.cancel()
 
     @tasks.loop(seconds=HUNGER_LOOP_TIME)
     async def hunger_task(self) -> None:
         """Task to decrease the hunger of all cats every minute."""
         self.cat_handler.decrease_hunger()
+
+    @tasks.loop(hours=24)
+    async def feed_notify_task(self) -> None:
+        """Task to notify users to feed their cats."""
+        hungry_cats = self.cat_handler.get_hungry_cats(threshold=NOTIFICATION_THRESHOLD)
+        if hungry_cats:
+            # Message each user that their cat is hungry
+            for user_id in hungry_cats:
+                user = await self.bot.fetch_user(user_id)
+                if user:
+                    logger.debug("Notifying user %d that their cat is hungry", user_id)
+                    await user.send(
+                        "Bruh, one of your cats is starving! Go feed it! :pouting_cat:"
+                    )
+                else:
+                    logger.warning(
+                        "Could not find user with ID %d to notify about hungry cat",
+                        user_id,
+                    )
 
     @app_commands.command(name="adopt", description="Adopt a new cat for the server!")
     @app_commands.describe(cat="The name of the cat to adopt")

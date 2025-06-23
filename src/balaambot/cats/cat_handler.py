@@ -171,6 +171,15 @@ class CatHandler:
                 if cat.hunger > 0:
                     cat.hunger -= 1
 
+    def get_hungry_cats(self, threshold: int = 10) -> list[int]:
+        """Return a list of user IDs whose cats are hungry (hunger below threshold)."""
+        hungry_owners = set()
+        for guild_cats in self.db.guild_cats.values():
+            for cat in guild_cats.values():
+                if cat.hunger < threshold:
+                    hungry_owners.add(cat.owner)
+        return list(hungry_owners)
+
     def _get_cat_id(self, cat_name: str) -> str:
         return cat_name.strip().lower()
 
