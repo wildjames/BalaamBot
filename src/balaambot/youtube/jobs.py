@@ -191,7 +191,8 @@ async def _play_next(
         )
 
         mixer.resume()
-        vc.play(mixer)
+        if not vc.is_playing():
+            vc.play(mixer)
 
         await _maybe_preload_next_tracks(vc, queue)
     except Exception:
