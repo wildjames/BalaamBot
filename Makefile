@@ -39,7 +39,7 @@ docker-build:
 docker-run:
 	docker run --rm -it \
 		--env-file .env \
-		-v $(PWD)/persistent:/app/persistent \
+		-v $(LOCAL_WORKSPACE_FOLDER)/persistent:/app/persistent \
 		balaambot:latest
 
 docker-brun: docker-build docker-run

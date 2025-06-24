@@ -15,6 +15,10 @@
     "mounts": [
         "source=${env:HOME}${env:USERPROFILE}/.ssh,target=/home/vscode/.ssh,type=bind"
     ],
+    "remoteEnv": {
+        // This is needed so Docker in MacOS can access the actual workspace folder
+        "LOCAL_WORKSPACE_FOLDER": "${localWorkspaceFolder}"
+    },
     "features": {
         "ghcr.io/dhoeric/features/hadolint:1": {},
         "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
