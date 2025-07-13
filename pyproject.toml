@@ -20,6 +20,7 @@ dependencies = [
     "pydantic>=2.11.5",
     "redis>=6.2.0",
     "pytest-asyncio>=1.0.0",
+    "rapidfuzz>=3.13.0",
 ]
 
 # Dev tools

@@ -2,6 +2,7 @@ import logging
 import pathlib
 
 import pydantic
+from rapidfuzz import fuzz, process
 
 import balaambot.config
 
@@ -10,10 +11,9 @@ logger = logging.getLogger(__name__)
 SAVE_FILE = pathlib.Path(balaambot.config.PERSISTENT_DATA_DIR) / "cats.json"
 MAX_CAT_HUNGER = 100
 CAT_FEED_THRESHOLD = 90
+CAT_MATCH_THRESHOLD = 50  # percent similarity needed for a fuzzy match
 
 
-# TODOs:
-# fuzzy search for cat names (try pkg: rapidfuzz)
 class Cat(pydantic.BaseModel):
     """Data representing a cat."""
 
@@ -65,8 +65,24 @@ class CatHandler:
         cats = self.db.guild_cats.get(guild_id)
         if not cats:
             return None
-        cat = cats.get(self._get_cat_id(cat_name))
-        return cat.name if cat else None
+
+        # exact match
+        cat_id = self._get_cat_id(cat_name)
+        if cat_id in cats:
+            return cats[cat_id].name
+
+        # fuzzy match against all IDs
+        match = process.extractOne(
+            cat_name, cats.keys(), scorer=fuzz.WRatio, score_cutoff=CAT_MATCH_THRESHOLD
+        )
+        if match:
+            matched_id, score, _ = match
+            logger.info(
+                "Fuzzy matched %r to %r (score=%d)", cat_name, matched_id, score
+            )
+            return cats[matched_id].name
+
+        return None
 
     def get_cat_names(self, guild_id: int) -> str:
         """Get a formatted list of cat names, owners, and hunger levels."""

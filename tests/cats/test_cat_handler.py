@@ -1,7 +1,7 @@
 import json
 import pytest
 import types
-from balaambot.cats.cat_handler import CatHandler
+from balaambot.cats.cat_handler import CatHandler, CAT_MATCH_THRESHOLD
 from balaambot.cats import cat_handler
 
 GUILD_ID = 12345
@@ -280,3 +280,23 @@ def test_get_hungry_cats(patch_save_file, patch_logger):
     handler.db.guild_cats[GUILD_ID][handler._get_cat_id("AnotherHungry")].hunger = 2
     result = handler.get_hungry_cats(threshold=10)
     assert result.count(1) == 1  # Should only appear once
+
+def test_get_cat_fuzzy_match_within_threshold(patch_save_file, patch_logger):
+    handler = CatHandler()
+    owner_id = 999
+    handler.add_cat("Snowball", GUILD_ID, owner_id)
+    # A one‐letter typo should still fuzzy‐match Snowball → "Snowball"
+    fuzzy_name = "Snowbal"  # missing final 'l'
+    assert handler.get_cat(fuzzy_name, GUILD_ID) == "Snowball"
+
+def test_get_cat_fuzzy_match_below_threshold(patch_save_file, patch_logger):
+    handler = CatHandler()
+    owner_id = 888
+    handler.add_cat("Snowball", GUILD_ID, owner_id)
+    # A very different string should not match
+    assert handler.get_cat("Sbownall", GUILD_ID) is None
+
+def test_threshold_constant_is_used():
+    # Ensure threshold is an integer percentage between 1 and 100
+    assert isinstance(CAT_MATCH_THRESHOLD, int)
+    assert 0 < CAT_MATCH_THRESHOLD <= 100
