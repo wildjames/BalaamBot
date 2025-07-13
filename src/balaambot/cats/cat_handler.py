@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 SAVE_FILE = pathlib.Path(balaambot.config.PERSISTENT_DATA_DIR) / "cats.json"
 MAX_CAT_HUNGER = 100
 CAT_FEED_THRESHOLD = 90
-CAT_MATCH_THRESHOLD = 50  # percent similarity needed for a fuzzy match
+CAT_MATCH_THRESHOLD = 75  # percent similarity needed for a fuzzy match
 
 
 class Cat(pydantic.BaseModel):

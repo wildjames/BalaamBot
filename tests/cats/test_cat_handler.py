@@ -294,7 +294,7 @@ def test_get_cat_fuzzy_match_below_threshold(patch_save_file, patch_logger):
     owner_id = 888
     handler.add_cat("Snowball", GUILD_ID, owner_id)
     # A very different string should not match
-    assert handler.get_cat("Sbownall", GUILD_ID) is None
+    assert handler.get_cat("cannonball", GUILD_ID) is None
 
 def test_threshold_constant_is_used():
     # Ensure threshold is an integer percentage between 1 and 100
