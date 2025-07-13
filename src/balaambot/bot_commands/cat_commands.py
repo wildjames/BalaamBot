@@ -7,6 +7,7 @@ from discord.ext import commands, tasks
 
 from balaambot.cats.cat_handler import MAX_CAT_HUNGER, CatHandler
 
+ENABLE_CAT_HUNGRY_MESSAGE = False
 MSG_NO_CAT = (
     "You don't have any cats yet! :crying_cat_face: Try adopting one with `/adopt`!"
 )
@@ -15,6 +16,8 @@ CAT_FEEDS_PER_DAY = 1
 HUNGER_LOOP_TIME = (CAT_FEEDS_PER_DAY * 24 * 60 * 60) / MAX_CAT_HUNGER
 # Hunger level at which to notify users
 NOTIFICATION_THRESHOLD = 10
+# Maximum allowed length for cat names
+MAX_CAT_NAME_LENGTH = 32
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +32,7 @@ class CatCommands(commands.Cog):
         self.hunger_task.start()
         self.feed_notify_task.start()
 
-    def cog_unload(self) -> None:
+    async def cog_unload(self) -> None:
         """Stop the hunger task when the cog is unloaded."""
         self.hunger_task.cancel()
         self.feed_notify_task.cancel()
@@ -42,6 +45,9 @@ class CatCommands(commands.Cog):
     @tasks.loop(hours=24)
     async def feed_notify_task(self) -> None:
         """Task to notify users to feed their cats."""
+        if not ENABLE_CAT_HUNGRY_MESSAGE:
+            logger.info("Daily reminder to feed cats is disabled. Skipping.")
+            return
         hungry_cats = self.cat_handler.get_hungry_cats(threshold=NOTIFICATION_THRESHOLD)
         if hungry_cats:
             # Message each user that their cat is hungry
@@ -68,6 +74,16 @@ class CatCommands(commands.Cog):
             cat,
             interaction.guild_id,
         )
+
+        # cat name length cant be too ridiculous
+        if len(cat) > MAX_CAT_NAME_LENGTH:
+            await interaction.response.send_message(
+                f"Cat names can be at most {MAX_CAT_NAME_LENGTH} characters long. "
+                "Please choose a shorter name.",
+                ephemeral=True,
+            )
+            return
+
         guild_id = 0 if interaction.guild_id is None else interaction.guild_id
 
         if self.cat_handler.get_cat(cat, guild_id):
@@ -104,7 +120,7 @@ class CatCommands(commands.Cog):
                 ephemeral=True,
             )
             return
-        msg = self.cat_handler.feed_cat(cat, guild_id, interaction.user.id)
+        msg = self.cat_handler.feed_cat(target_cat, guild_id, interaction.user.id)
         await interaction.response.send_message(msg)
 
     @app_commands.command(name="pet", description="Try to pet one of our cats!")
