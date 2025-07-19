@@ -230,6 +230,9 @@ class MusicCommands(commands.Cog):
         total_runtime = 0
 
         for i, url in enumerate(upcoming):
+            if len(lines) >= self.MAX_QUEUE_REPORT_LENGTH:
+                pass
+
             new_line = f"{i + 1}. [Invalid track URL]({url})"
 
             track_meta = await yt_audio.get_youtube_track_metadata(url)
@@ -246,9 +249,7 @@ class MusicCommands(commands.Cog):
                     f"{i + 1}. *{track_meta['title']}* ({track_meta['runtime_str']})"
                 )
             total_runtime += track_meta["runtime"]
-
-            if len(lines) < self.MAX_QUEUE_REPORT_LENGTH:
-                lines.append(new_line)
+            lines.append(new_line)
 
         msg = (
             f"\n\n**Upcoming tracks ({len(lines)} of {len(upcoming)} shown):**\n"
