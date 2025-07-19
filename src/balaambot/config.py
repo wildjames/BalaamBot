@@ -4,11 +4,11 @@ import os
 from logging import getLogger
 from pathlib import Path
 
-from discord.ext import voice_recv
+import discord
 
 logger = getLogger(__name__)
 
-DISCORD_VOICE_CLIENT = voice_recv.VoiceRecvClient
+DISCORD_VOICE_CLIENT = discord.VoiceClient
 
 # Docker volume to hold all persistent data
 PERSISTENT_DATA_DIR = os.getenv("PERSISTENT_DATA_DIR", default="persistent")
