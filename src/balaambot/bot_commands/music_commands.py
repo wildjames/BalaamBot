@@ -232,30 +232,36 @@ class MusicCommands(commands.Cog):
                 new_line = f"{i + 1}. [Invalid track URL]({url})"
                 track_meta = await yt_audio.get_youtube_track_metadata(url)
                 if track_meta is not None:
-                    new_line = (
-                        f"{i + 1}. {track_meta['title']} ({track_meta['runtime_str']})"
-                    )
+                    if i == 0:
+                        # Only the first track gets a URL link and a now playing tag
+                        new_line = (
+                            f"# Now playing: [{track_meta['title']}]"
+                            f"({track_meta['url']})"
+                            f" ({track_meta['runtime_str']})"
+                        )
+                    else:
+                        new_line = (
+                            f"{i + 1}. *{track_meta['title']}* "
+                            f"({track_meta['runtime_str']})"
+                        )
                     total_runtime += track_meta["runtime"]
-                if len(lines) > self.MAX_QUEUE_REPORT_LENGTH:
+                if len(lines) < self.MAX_QUEUE_REPORT_LENGTH:
                     lines.append(new_line)
 
-            track_meta = await yt_audio.get_youtube_track_metadata(upcoming[0])
-            if track_meta is None:
-                lines[0] = f"**Now playing:** [Invalid track URL]({upcoming[0]})"
-            else:
-                lines[0] = (
-                    "**Now playing:** "
-                    f"[{track_meta['title']}]({track_meta['url']})"
-                    f" ({track_meta['runtime_str']})"
-                )
+            if not len(upcoming):
+                msg = "The queue is empty."
+                await interaction.followup.send(msg, ephemeral=True)
+
+            msg = ""
+
             msg = (
-                f"**Upcoming tracks ({len(lines)} of {len(upcoming)} shown):**\n"
+                f"\n\n**Upcoming tracks ({len(lines)} of {len(upcoming)} shown):**\n"
                 + "\n".join(lines)
             )
 
             # format runtime as H:MM:SS or M:SS
             total_runtime_str = sec_to_string(total_runtime)
-            msg += f"\n\n🔮    Total runtime: {total_runtime_str}"
+            msg += f"\n\n###    Total runtime: {total_runtime_str}"
 
         await interaction.followup.send(msg, ephemeral=True)
 
