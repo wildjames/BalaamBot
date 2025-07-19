@@ -239,7 +239,7 @@ class MusicCommands(commands.Cog):
                 new_line = (
                     f"# Now playing: [{track_meta['title']}]"
                     f"({track_meta['url']})"
-                    f" ({track_meta['runtime_str']})"
+                    f" ({track_meta['runtime_str']})\n"
                 )
             else:
                 new_line = (
