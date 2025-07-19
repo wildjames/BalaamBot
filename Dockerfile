@@ -19,6 +19,7 @@ ENV UV_PYTHON_DOWNLOADS=0
 # Install packages needed for building the app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
+    git-svn=1:2.39.5-0+deb12u2 \
     # build-essential=12.9 \
     # ca-certificates=20230311 \
     # curl=7.88.1-10+deb12u12 \
