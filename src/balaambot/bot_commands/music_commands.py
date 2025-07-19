@@ -216,7 +216,7 @@ class MusicCommands(commands.Cog):
         await interaction.response.defer(ephemeral=True, thinking=True)
         channel_member = await discord_utils.require_voice_channel(interaction)
         if channel_member is None:
-            return
+            return None
         channel, _member = channel_member
         guild = channel.guild
         vc = await discord_utils.ensure_connected(guild, channel)
@@ -224,46 +224,42 @@ class MusicCommands(commands.Cog):
 
         if not upcoming:
             msg = "The queue is empty."
-        else:
-            lines: list[str] = []
-            total_runtime = 0
+            return await interaction.followup.send(msg, ephemeral=True)
 
-            for i, url in enumerate(upcoming):
-                new_line = f"{i + 1}. [Invalid track URL]({url})"
-                track_meta = await yt_audio.get_youtube_track_metadata(url)
-                if track_meta is not None:
-                    if i == 0:
-                        # Only the first track gets a URL link and a now playing tag
-                        new_line = (
-                            f"# Now playing: [{track_meta['title']}]"
-                            f"({track_meta['url']})"
-                            f" ({track_meta['runtime_str']})"
-                        )
-                    else:
-                        new_line = (
-                            f"{i + 1}. *{track_meta['title']}* "
-                            f"({track_meta['runtime_str']})"
-                        )
-                    total_runtime += track_meta["runtime"]
-                if len(lines) < self.MAX_QUEUE_REPORT_LENGTH:
-                    lines.append(new_line)
+        lines: list[str] = []
+        total_runtime = 0
 
-            if not len(upcoming):
-                msg = "The queue is empty."
-                await interaction.followup.send(msg, ephemeral=True)
+        for i, url in enumerate(upcoming):
+            new_line = f"{i + 1}. [Invalid track URL]({url})"
 
-            msg = ""
+            track_meta = await yt_audio.get_youtube_track_metadata(url)
 
-            msg = (
-                f"\n\n**Upcoming tracks ({len(lines)} of {len(upcoming)} shown):**\n"
-                + "\n".join(lines)
-            )
+            if i == 0:
+                # Only the first track gets a URL link and a now playing tag
+                new_line = (
+                    f"# Now playing: [{track_meta['title']}]"
+                    f"({track_meta['url']})"
+                    f" ({track_meta['runtime_str']})"
+                )
+            else:
+                new_line = (
+                    f"{i + 1}. *{track_meta['title']}* ({track_meta['runtime_str']})"
+                )
+            total_runtime += track_meta["runtime"]
 
-            # format runtime as H:MM:SS or M:SS
-            total_runtime_str = sec_to_string(total_runtime)
-            msg += f"\n\n###    Total runtime: {total_runtime_str}"
+            if len(lines) < self.MAX_QUEUE_REPORT_LENGTH:
+                lines.append(new_line)
 
-        await interaction.followup.send(msg, ephemeral=True)
+        msg = (
+            f"\n\n**Upcoming tracks ({len(lines)} of {len(upcoming)} shown):**\n"
+            + "\n".join(lines)
+        )
+
+        # format runtime as H:MM:SS or M:SS
+        total_runtime_str = sec_to_string(total_runtime)
+        msg += f"\n\n###    Total runtime: {total_runtime_str}"
+
+        return await interaction.followup.send(msg, ephemeral=True)
 
     @app_commands.command(name="skip", description="Skip the current YouTube track")
     async def skip(self, interaction: discord.Interaction) -> None:
