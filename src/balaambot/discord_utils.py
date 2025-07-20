@@ -8,7 +8,7 @@ from balaambot.config import DISCORD_VOICE_CLIENT
 
 logger = logging.getLogger(__name__)
 
-MAX__MESSAGE_LENGTH = 2000
+MAX_MESSAGE_LENGTH = 2000
 
 
 async def _send_interaction_message(
