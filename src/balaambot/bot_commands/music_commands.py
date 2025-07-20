@@ -18,6 +18,8 @@ logger = logging.getLogger(__name__)
 class SearchView(View):
     """A view containing buttons for selecting search results."""
 
+    max_button_text_length = 80
+
     def __init__(
         self, parent: "MusicCommands", results_list: list[tuple[str, str, float]]
     ) -> None:
@@ -26,16 +28,25 @@ class SearchView(View):
         self.results = results_list
         self.parent = parent
 
-        for idx, (url, title, _) in enumerate(self.results):
+        for idx, (url, title, runtime) in enumerate(self.results):
+            timestamp_label = f"    ({sec_to_string(runtime)})"
+
+            if len(title) + len(timestamp_label) >= self.max_button_text_length:
+                title_length = self.max_button_text_length - len(timestamp_label) - 3
+                label = title[:title_length] + "..."
+            else:
+                label = title
+
             button = Button(  # type: ignore  This type error is daft and I hate it so fuck that
-                label=f"{idx + 1}",
+                label=f"{label}    ({sec_to_string(runtime)})",
                 style=discord.ButtonStyle.primary,
                 custom_id=f"search_select_{idx}",
+                row=idx,
             )
 
             # Bind a callback that knows which index was clicked
             button.callback = self.make_callback(idx, url, title)  # type: ignore The button is well defined
-            self.add_item(button)  # type: ignore The button is well defined
+            self.add_item(button)
 
     def make_callback(
         self, idx: int, url: str, title: str
@@ -64,10 +75,81 @@ class SearchView(View):
         return callback
 
 
+class PruneView(View):
+    """A view for pruning tracks from the queue."""
+
+    def __init__(
+        self,
+        parent: "MusicCommands",
+        vc: discord_utils.DISCORD_VOICE_CLIENT,
+        prunable_items: list[tuple[str, str]],
+        max_button_text_length: int = 80,
+    ) -> None:
+        """Initialize the prune view."""
+        super().__init__(timeout=None)  # no timeout so buttons remain valid
+        self.parent = parent
+        self.vc = vc
+        self.prunable_items = prunable_items
+
+        for idx, (url, title) in enumerate(prunable_items):
+            # truncate to Discords 80-char label limit
+            label = (
+                title
+                if len(title) <= max_button_text_length
+                else title[: max_button_text_length - 3] + "..."
+            )
+            button = Button(
+                label=label,
+                style=discord.ButtonStyle.danger,
+                custom_id=f"prune_{idx}",
+                row=idx,
+            )
+            button.callback = self.make_callback(url)  # type: ignore The button is well defined
+            self.add_item(button)
+
+    def make_callback(
+        self, url: str
+    ) -> Callable[
+        [discord.Interaction], Awaitable[InteractionCallbackResponse[Client] | None]
+    ]:
+        """Generate a callback which removes this element from the queue."""
+
+        async def callback(
+            interaction: discord.Interaction,
+        ) -> InteractionCallbackResponse[Client] | None:
+            # Log which result the user picked
+            logger.info(
+                "User '%s' in channel '%s' selected to prune track URL: '%s'",
+                interaction.user.name,
+                interaction.channel_id,
+                url,
+            )
+
+            success = await yt_jobs.prune_queue(self.vc, url=url)
+            if not success:
+                await interaction.response.send_message(
+                    "Failed to remove track. Please check the position and try again.",
+                    ephemeral=True,
+                )
+                return None
+
+            track_meta = await yt_audio.get_youtube_track_metadata(url)
+
+            await interaction.response.edit_message(
+                content=f"Removed track {track_meta['title']} from the queue.",
+                view=None,
+                delete_after=20,
+            )
+            return None
+
+        return callback
+
+
 class MusicCommands(commands.Cog):
     """Slash commands for YouTube queue and playback."""
 
     MAX_QUEUE_REPORT_LENGTH = 10
+    PRUNE_REPORT_LENGTH = 5
 
     def __init__(self, bot: commands.Bot) -> None:
         """Initialize the MusicCommands cog."""
@@ -131,16 +213,7 @@ class MusicCommands(commands.Cog):
             )
             return
 
-        # Build a text block describing each result line by line
-        lines: list[str] = []
-        for idx, (_, title, duration_secs) in enumerate(results):
-            duration_str = sec_to_string(duration_secs)
-            lines.append(f"**{idx + 1}.** {title} ({duration_str})")
-
-        description = (
-            "Select a track by clicking the corresponding button:\n\n"
-            + "\n".join(lines)
-        )
+        description = "Select a track by clicking the corresponding button:\n\n"
 
         # Send the reply with the View
         await interaction.followup.send(
@@ -220,64 +293,58 @@ class MusicCommands(commands.Cog):
         channel, _member = channel_member
         guild = channel.guild
         vc = await discord_utils.ensure_connected(guild, channel)
-        upcoming = await yt_jobs.list_queue(vc)
 
-        logger.info(
-            "Listing queue for guild_id=%s, %d upcoming tracks",
-            guild.id,
-            len(upcoming),
+        msg = await yt_jobs.create_queue_message(
+            vc, guild, self.MAX_QUEUE_REPORT_LENGTH
         )
-
-        if not upcoming:
-            msg = "The queue is empty."
-            return await interaction.followup.send(msg, ephemeral=True)
-
-        lines: list[str] = []
-        total_runtime = 0
-
-        for i, url in enumerate(upcoming[: self.MAX_QUEUE_REPORT_LENGTH]):
-            new_line = f"{i + 1}. [Invalid track URL]({url})"
-
-            track_meta = await yt_audio.get_youtube_track_metadata(url)
-
-            total_runtime += track_meta["runtime"]
-
-            if i == 0:
-                # Only the first track gets a URL link and a now playing tag
-                new_line = (
-                    f"# Now playing: [{track_meta['title']}]"
-                    f"({track_meta['url']})"
-                    f" ({track_meta['runtime_str']})\n"
-                )
-            else:
-                new_line = (
-                    f"{i + 1}. *{track_meta['title']}* ({track_meta['runtime_str']})"
-                )
-
-            lines.append(new_line)
-
-        msg = (
-            f"\n\n**Upcoming tracks ({len(lines)} of {len(upcoming)} shown):**\n"
-            + "\n".join(lines)
-        )
-
-        # format runtime as H:MM:SS or M:SS
-        total_runtime_str = sec_to_string(total_runtime)
-        msg += f"\n\n###    Total runtime: {total_runtime_str}"
-
-        logger.info(
-            "List queue for guild_id=%s will report the next %d tracks",
-            guild.id,
-            len(lines),
-        )
-        logger.debug("Queue for guild_id=%s: '%s'", guild.id, msg)
-        if len(msg) > discord_utils.MAX_MESSAGE_LENGTH:
-            msg = (
-                "Queue is too long to display. "
-                "Please use `/clear_queue` to clear the queue."
-            )
 
         return await interaction.followup.send(msg, ephemeral=True)
+
+    @app_commands.command(
+        name="prune_queue", description="Remove a track from the YouTube queue"
+    )
+    async def prune_queue(self, interaction: discord.Interaction) -> None:
+        """Remove a track from the YouTube queue by its position."""
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        channel_member = await discord_utils.require_voice_channel(interaction)
+        if channel_member is None:
+            return await interaction.followup.send(
+                "You must be in a voice channel to prune the queue.", ephemeral=True
+            )
+        channel, _member = channel_member
+        guild = channel.guild
+        vc = await discord_utils.ensure_connected(guild, channel)
+
+        queued_urls = await yt_jobs.list_queue(vc)
+        if not queued_urls:
+            return await interaction.followup.send(
+                "The queue is empty. Nothing to prune.", ephemeral=True
+            )
+
+        if len(queued_urls) == 1:
+            return await interaction.followup.send(
+                "There is only one track in the queue. "
+                "Use `/stop_music` to clear the queue.",
+                ephemeral=True,
+            )
+
+        # build a list of (url, title) tuples for the head of the prunable tracks list
+        prunable_urls = queued_urls[1 : self.PRUNE_REPORT_LENGTH + 1]
+        prunable_items: list[tuple[str, str]] = []
+        for url in prunable_urls:
+            meta = await yt_audio.get_youtube_track_metadata(url)
+            prunable_items.append((url, meta["title"]))
+
+        # Build the "now playing" portion of the queue message
+        msg = await yt_jobs.create_queue_message(vc, guild, 1)
+        msg += "\n\nSelect a track to prune from the queue:"
+
+        return await interaction.followup.send(
+            msg,
+            view=PruneView(self, vc, prunable_items),
+            ephemeral=True,
+            suppress_embeds=True,
+        )
 
     @app_commands.command(name="skip", description="Skip the current YouTube track")
     async def skip(self, interaction: discord.Interaction) -> None:

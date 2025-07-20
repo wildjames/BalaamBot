@@ -2,6 +2,7 @@ import logging
 from collections.abc import Callable
 
 from discord.channel import CategoryChannel, ForumChannel
+from discord.guild import Guild
 
 from balaambot import discord_utils, utils
 from balaambot.youtube.download import (
@@ -231,6 +232,119 @@ async def clear_queue(vc: discord_utils.DISCORD_VOICE_CLIENT) -> None:
 async def list_queue(vc: discord_utils.DISCORD_VOICE_CLIENT) -> list[str]:
     """Return the list of queued URLs for the voice client."""
     return list(youtube_queue.get(vc.guild.id, []))
+
+
+async def create_queue_message(
+    vc: discord_utils.DISCORD_VOICE_CLIENT,
+    guild: Guild,
+    max_queue_elements_to_report: int = 10,
+    *,
+    embed_enabled: bool = True,
+) -> str:
+    """Construct the message body to display the head of the current queue."""
+    upcoming = await list_queue(vc)
+    logger.info(
+        "Listing queue for guild_id=%s, %d upcoming tracks",
+        guild.id,
+        len(upcoming),
+    )
+
+    if not upcoming:
+        return "The queue is empty."
+
+    lines: list[str] = []
+    total_runtime = 0
+
+    for i, url in enumerate(upcoming[:max_queue_elements_to_report]):
+        new_line = f"{i + 1}. [Invalid track URL]({url})"
+
+        track_meta = await get_youtube_track_metadata(url)
+
+        total_runtime += track_meta["runtime"]
+
+        if i == 0:
+            # Only the first track gets a URL link and a now playing tag
+            if embed_enabled:
+                new_line = (
+                    f"# Now playing: [{track_meta['title']}]"
+                    f"({track_meta['url']})"
+                    f" ({track_meta['runtime_str']})\n"
+                )
+            else:
+                new_line = (
+                    f"# Now playing: [{track_meta['title']}]"
+                    f" ({track_meta['runtime_str']})\n"
+                )
+        else:
+            new_line = f"{i + 1}. *{track_meta['title']}* ({track_meta['runtime_str']})"
+
+        lines.append(new_line)
+
+    msg = (
+        f"\n\n**Upcoming tracks ({len(lines)} of {len(upcoming)} shown):**\n"
+        + "\n".join(lines)
+    )
+
+    # format runtime as H:MM:SS or M:SS
+    total_runtime_str = utils.sec_to_string(total_runtime)
+    msg += f"\n\n###    Total runtime: {total_runtime_str}"
+
+    logger.info(
+        "List queue for guild_id=%s will report the next %d tracks",
+        guild.id,
+        len(lines),
+    )
+    logger.debug("Queue for guild_id=%s: '%s'", guild.id, msg)
+    if len(msg) > discord_utils.MAX_MESSAGE_LENGTH:
+        msg = (
+            "Queue is too long to display. "
+            "Please use `/clear_queue` to clear the queue."
+        )
+
+    return msg
+
+
+async def prune_queue(
+    vc: discord_utils.DISCORD_VOICE_CLIENT,
+    index: int | None = None,
+    url: str | None = None,
+) -> bool:
+    """Remove a track from the queue at the specified index."""
+    queue = youtube_queue.get(vc.guild.id)
+
+    if index:
+        if not queue or index < 0 or index >= len(queue):
+            logger.warning("Invalid index %d for guild_id=%s", index, vc.guild.id)
+            return False
+
+        removed_url = queue.pop(index)
+        logger.info(
+            "Removed URL %s from queue for guild_id=%s at index %d",
+            removed_url,
+            vc.guild.id,
+            index,
+        )
+        return True
+
+    if url:
+        if not queue or url not in queue:
+            logger.warning(
+                "URL %s not found in queue for guild_id=%s", url, vc.guild.id
+            )
+            return False
+
+        queue.remove(url)
+        logger.info(
+            "Removed URL %s from queue for guild_id=%s",
+            url,
+            vc.guild.id,
+        )
+        return True
+
+    logger.warning(
+        "No index or URL provided to prune queue for guild_id=%s", vc.guild.id
+    )
+    return False
 
 
 async def stop(vc: discord_utils.DISCORD_VOICE_CLIENT) -> None:
