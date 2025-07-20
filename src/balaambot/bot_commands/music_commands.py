@@ -222,6 +222,12 @@ class MusicCommands(commands.Cog):
         vc = await discord_utils.ensure_connected(guild, channel)
         upcoming = await yt_jobs.list_queue(vc)
 
+        logger.info(
+            "Listing queue for guild_id=%s, %d upcoming tracks",
+            guild.id,
+            len(upcoming),
+        )
+
         if not upcoming:
             msg = "The queue is empty."
             return await interaction.followup.send(msg, ephemeral=True)
@@ -229,13 +235,12 @@ class MusicCommands(commands.Cog):
         lines: list[str] = []
         total_runtime = 0
 
-        for i, url in enumerate(upcoming):
-            if len(lines) >= self.MAX_QUEUE_REPORT_LENGTH:
-                pass
-
+        for i, url in enumerate(upcoming[: self.MAX_QUEUE_REPORT_LENGTH]):
             new_line = f"{i + 1}. [Invalid track URL]({url})"
 
             track_meta = await yt_audio.get_youtube_track_metadata(url)
+
+            total_runtime += track_meta["runtime"]
 
             if i == 0:
                 # Only the first track gets a URL link and a now playing tag
@@ -248,7 +253,7 @@ class MusicCommands(commands.Cog):
                 new_line = (
                     f"{i + 1}. *{track_meta['title']}* ({track_meta['runtime_str']})"
                 )
-            total_runtime += track_meta["runtime"]
+
             lines.append(new_line)
 
         msg = (
@@ -259,6 +264,18 @@ class MusicCommands(commands.Cog):
         # format runtime as H:MM:SS or M:SS
         total_runtime_str = sec_to_string(total_runtime)
         msg += f"\n\n###    Total runtime: {total_runtime_str}"
+
+        logger.info(
+            "List queue for guild_id=%s will report the next %d tracks",
+            guild.id,
+            len(lines),
+        )
+        logger.debug("Queue for guild_id=%s: '%s'", guild.id, msg)
+        if len(msg) > discord_utils.MAX_MESSAGE_LENGTH:
+            msg = (
+                "Queue is too long to display. "
+                "Please use `/clear_queue` to clear the queue."
+            )
 
         return await interaction.followup.send(msg, ephemeral=True)
 
