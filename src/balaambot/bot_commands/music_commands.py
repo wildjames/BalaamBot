@@ -222,9 +222,7 @@ class MusicCommands(commands.Cog):
 
         """
         await interaction.response.defer(thinking=True, ephemeral=True)
-        await self._enqueue(
-            interaction, query, "play_next", queue_to_top=True
-        )
+        await self._enqueue(interaction, query, "play_next", queue_to_top=True)
 
     async def do_search_youtube(
         self,
