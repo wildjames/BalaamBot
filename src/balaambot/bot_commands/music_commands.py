@@ -15,62 +15,62 @@ from balaambot.youtube import utils as yt_utils
 logger = logging.getLogger(__name__)
 
 
+def truncate_label(text: str, suffix: str = "", max_length: int = 80) -> str:
+    """Utility to truncate button labels to Discord's limit."""
+    total_len = len(text) + len(suffix)
+    if total_len <= max_length:
+        return text
+    # leave room for ellipsis
+    return text[: max_length - len(suffix) - 3] + "..."
+
+
 class SearchView(View):
     """A view containing buttons for selecting search results."""
 
-    max_button_text_length = 80
-
     def __init__(
-        self, parent: "MusicCommands", results_list: list[tuple[str, str, float]]
+        self,
+        parent: "MusicCommands",
+        results: list[tuple[str, str, float]],
+        *,
+        queue_to_top: bool = False,
     ) -> None:
         """Set up the internal structures."""
         super().__init__(timeout=None)  # no timeout so buttons remain valid
-        self.results = results_list
         self.parent = parent
 
-        for idx, (url, title, runtime) in enumerate(self.results):
-            timestamp_label = f"    ({sec_to_string(runtime)})"
-
-            if len(title) + len(timestamp_label) >= self.max_button_text_length:
-                title_length = self.max_button_text_length - len(timestamp_label) - 3
-                label = title[:title_length] + "..."
-            else:
-                label = title
-
-            button = Button(  # type: ignore  This type error is daft and I hate it so fuck that
-                label=f"{label}    ({sec_to_string(runtime)})",
+        for idx, (url, title, runtime) in enumerate(results):
+            label_text = truncate_label(title, suffix=f" ({sec_to_string(runtime)})")
+            btn = Button(
+                label=f"{label_text} ({sec_to_string(runtime)})",
                 style=discord.ButtonStyle.primary,
-                custom_id=f"search_select_{idx}",
+                custom_id=f"search_{idx}",
                 row=idx,
             )
+            btn.callback = self._make_callback(
+                idx, url, title, queue_to_top=queue_to_top
+            )  # type: ignore The button is well defined
+            self.add_item(btn)
 
-            # Bind a callback that knows which index was clicked
-            button.callback = self.make_callback(idx, url, title)  # type: ignore The button is well defined
-            self.add_item(button)
-
-    def make_callback(
-        self, idx: int, url: str, title: str
+    def _make_callback(
+        self, idx: int, url: str, title: str, *, queue_to_top: bool
     ) -> Callable[
         [discord.Interaction], Awaitable[InteractionCallbackResponse[Client] | None]
     ]:
-        """Handle the clicking of the buttons."""
-
         async def callback(
-            inner_interaction: discord.Interaction,
+            interaction: discord.Interaction,
         ) -> InteractionCallbackResponse[Client] | None:
-            # Log which result the user picked
             logger.info(
                 'User %s selected search result #%d: %s ("%s")',
-                inner_interaction.user.name,
+                interaction.user.name,
                 idx + 1,
                 url,
                 title,
             )
 
-            await inner_interaction.response.edit_message(
+            await interaction.response.edit_message(
                 content=f"Playing {title}", view=None, delete_after=5
             )
-            await self.parent.do_play(inner_interaction, url)
+            await self.parent.do_play(interaction, url, queue_to_top=queue_to_top)
 
         return callback
 
@@ -82,42 +82,31 @@ class PruneView(View):
         self,
         parent: "MusicCommands",
         vc: discord_utils.DISCORD_VOICE_CLIENT,
-        prunable_items: list[tuple[str, str]],
-        max_button_text_length: int = 80,
+        items: list[tuple[str, str]],
     ) -> None:
         """Initialize the prune view."""
-        super().__init__(timeout=None)  # no timeout so buttons remain valid
+        super().__init__(timeout=None)
         self.parent = parent
         self.vc = vc
-        self.prunable_items = prunable_items
-
-        for idx, (url, title) in enumerate(prunable_items):
-            # truncate to Discords 80-char label limit
-            label = (
-                title
-                if len(title) <= max_button_text_length
-                else title[: max_button_text_length - 3] + "..."
-            )
-            button = Button(
+        for idx, (url, title) in enumerate(items):
+            label = truncate_label(title, max_length=80)
+            btn = Button(
                 label=label,
                 style=discord.ButtonStyle.danger,
                 custom_id=f"prune_{idx}",
                 row=idx,
             )
-            button.callback = self.make_callback(url)  # type: ignore The button is well defined
-            self.add_item(button)
+            btn.callback = self._make_callback(url)  # type: ignore The button is well defined
+            self.add_item(btn)
 
-    def make_callback(
+    def _make_callback(
         self, url: str
     ) -> Callable[
         [discord.Interaction], Awaitable[InteractionCallbackResponse[Client] | None]
     ]:
-        """Generate a callback which removes this element from the queue."""
-
         async def callback(
             interaction: discord.Interaction,
         ) -> InteractionCallbackResponse[Client] | None:
-            # Log which result the user picked
             logger.info(
                 "User '%s' in channel '%s' selected to prune track URL: '%s'",
                 interaction.user.name,
@@ -155,47 +144,92 @@ class MusicCommands(commands.Cog):
         """Initialize the MusicCommands cog."""
         self.bot = bot
 
-    @app_commands.command(
-        name="play", description="Enqueue and play a YouTube video audio"
-    )
-    @app_commands.describe(query="YouTube video URL, playlist URL, or search term")
-    async def play(self, interaction: discord.Interaction, query: str) -> None:
-        """Enqueue a YouTube URL; starts playback if idle."""
-        await interaction.response.defer(thinking=True, ephemeral=True)
-
+    async def _enqueue(
+        self,
+        interaction: discord.Interaction,
+        query: str,
+        command_name: str,
+        *,
+        queue_to_top: bool,
+    ) -> None:
         query = query.strip()
-
-        # Handle playlist URLs
-        if yt_utils.is_valid_youtube_playlist(query):
-            logger.info("Received play command for playlist URL: '%s'", query)
-            self.bot.loop.create_task(self.do_play_playlist(interaction, query))
-
-        # Handle youtube videos
-        elif yt_utils.is_valid_youtube_url(query):
-            logger.info("Received play command for URL: '%s'", query)
-            self.bot.loop.create_task(self.do_play(interaction, query))
-
-        # Fall back to searching youtube and asking the user to select a search result
-        elif query:
-            logger.info("Received a string. Searching youtube for videos. '%s'", query)
-            self.bot.loop.create_task(self.do_search_youtube(interaction, query))
-
-        else:
-            # Failed to do anything. I think this is only reached if the query is empty?
+        if not query:
             await interaction.followup.send(
-                content=(
-                    "Invalid play command. Please provide a valid youtube video "
-                    "or playlist link, or a searchable string."
-                ),
+                f"Invalid {command_name} command. Provide a valid URL or search term.",
                 ephemeral=True,
             )
             logger.warning(
-                "Received an empty query for play command in guild_id=%s",
-                interaction.guild_id,
+                "Empty query for %s in guild %s", command_name, interaction.guild_id
             )
+            return
+
+        if yt_utils.is_valid_youtube_playlist(query):
+            logger.info("%s playlist URL: %s", command_name, query)
+            task = self.do_play_playlist(interaction, query, queue_to_top=queue_to_top)
+        elif yt_utils.is_valid_youtube_url(query):
+            logger.info("%s video URL: %s", command_name, query)
+            task = self.do_play(interaction, query, queue_to_top=queue_to_top)
+        else:
+            logger.info("%s search query: %s", command_name, query)
+            task = self.do_search_youtube(interaction, query, queue_to_top=queue_to_top)
+
+        task = self.bot.loop.create_task(task)
+        try:
+            await task
+        except Exception as e:
+            logger.exception(
+                "Error while processing %s command for query '%s'",
+                command_name,
+                query,
+            )
+            await interaction.followup.send(
+                f"An error occurred while processing your {command_name} request: {e}",
+                ephemeral=True,
+            )
+            return
+
+    @app_commands.command(
+        name="play", description="Enqueue and play a YouTube video audio"
+    )
+    @app_commands.describe(query="YouTube URL, playlist URL, or search term")
+    async def play(self, interaction: discord.Interaction, query: str) -> None:
+        """Enqueue and play a YouTube video audio.
+
+        Parameters
+        ----------
+        interaction : discord.Interaction
+            The interaction from Discord.
+        query : str
+            The YouTube URL, playlist URL, or search term to search and play.
+
+        """
+        await interaction.response.defer(thinking=True, ephemeral=True)
+        await self._enqueue(interaction, query, "play", queue_to_top=False)
+
+    @app_commands.command(
+        name="play_next", description="Queue a track to the top of the queue"
+    )
+    @app_commands.describe(query="YouTube URL, playlist URL, or search term")
+    async def play_next(self, interaction: discord.Interaction, query: str) -> None:
+        """Queue a track to the top of the queue.
+
+        Parameters
+        ----------
+        interaction : discord.Interaction
+            The Discord interaction triggering the command.
+        query : str
+            The YouTube URL, playlist URL, or search term.
+
+        """
+        await interaction.response.defer(thinking=True, ephemeral=True)
+        await self._enqueue(interaction, query, "play_next", queue_to_top=True)
 
     async def do_search_youtube(
-        self, interaction: discord.Interaction, query: str
+        self,
+        interaction: discord.Interaction,
+        query: str,
+        *,
+        queue_to_top: bool = False,
     ) -> None:
         """Search for videos based on the query and display selection buttons."""
         # Check if the user is in a voice channel
@@ -218,12 +252,16 @@ class MusicCommands(commands.Cog):
         # Send the reply with the View
         await interaction.followup.send(
             content=description,
-            view=SearchView(self, results),
+            view=SearchView(self, results, queue_to_top=queue_to_top),
             ephemeral=True,
         )
 
     async def do_play_playlist(
-        self, interaction: discord.Interaction, playlist_url: str
+        self,
+        interaction: discord.Interaction,
+        playlist_url: str,
+        *,
+        queue_to_top: bool = False,
     ) -> None:
         """Handle enqueuing all videos from a YouTube playlist."""
         # Check if the user is in a voice channel
@@ -240,11 +278,12 @@ class MusicCommands(commands.Cog):
             )
 
         # Enqueue all tracks and start background fetches
-        for track_url in track_urls:
-            # These have to be awaited, to preserve order.
-            await yt_jobs.add_to_queue(
-                vc, track_url, text_channel=interaction.channel_id
-            )
+        await yt_jobs.add_to_queue(
+            vc,
+            track_urls,
+            text_channel=interaction.channel_id,
+            queue_to_top=queue_to_top,
+        )
 
         # Confirmation message
         await interaction.followup.send(
@@ -253,7 +292,9 @@ class MusicCommands(commands.Cog):
 
         return None
 
-    async def do_play(self, interaction: discord.Interaction, url: str) -> None:
+    async def do_play(
+        self, interaction: discord.Interaction, url: str, *, queue_to_top: bool = False
+    ) -> None:
         """Play a YouTube video by fetching and streaming the audio from the URL."""
         # Check if the user is in a voice channel
         vc_mixer = await discord_utils.get_voice_channel_mixer(interaction)
@@ -262,7 +303,9 @@ class MusicCommands(commands.Cog):
         vc, mixer = vc_mixer
 
         # Add to queue. Playback (in mixer) will await cache when it's time
-        await yt_jobs.add_to_queue(vc, url, text_channel=interaction.channel_id)
+        await yt_jobs.add_to_queue(
+            vc, [url], text_channel=interaction.channel_id, queue_to_top=queue_to_top
+        )
 
         track_meta = await yt_audio.get_youtube_track_metadata(url)
         if track_meta is None:
@@ -273,7 +316,10 @@ class MusicCommands(commands.Cog):
             return
 
         queue = await yt_jobs.list_queue(vc)
-        pos = len(queue)
+        try:
+            pos = queue.index(url) + 1
+        except ValueError:
+            pos = -1
 
         runtime = track_meta["runtime_str"]
 

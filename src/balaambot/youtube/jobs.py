@@ -25,20 +25,47 @@ logger = logging.getLogger(__name__)
 
 
 async def add_to_queue(
-    vc: discord_utils.DISCORD_VOICE_CLIENT, url: str, text_channel: int | None = None
+    vc: discord_utils.DISCORD_VOICE_CLIENT,
+    urls: list[str],
+    text_channel: int | None = None,
+    *,
+    queue_to_top: bool = False,
 ) -> None:
-    """Add a YouTube URL to the playback queue for the given voice client.
+    """Add YouTube URLs to the playback queue for the given voice client.
 
     If nothing is playing, start playback immediately.
     """
     queue = youtube_queue.setdefault(vc.guild.id, [])
-    queue.append(url)
-    logger.info(
-        "Queued URL %s for guild_id=%s (queue length=%d)", url, vc.guild.id, len(queue)
-    )
+
+    current_track = queue[0] if queue else None
+
+    # remove current track if exists
+    queue = queue[1:] if current_track else queue
+
+    # Add the new URLs to the queue
+    if queue_to_top:
+        urls.extend(queue)
+        queue = urls
+    else:
+        queue.extend(urls)
+
+    for url in urls:
+        logger.info(
+            "Queued URL %s for guild_id=%s (queue length=%d)",
+            url,
+            vc.guild.id,
+            len(queue),
+        )
+
+    # re-add current track to top
+    if current_track:
+        queue.insert(0, current_track)
+
+    youtube_queue[vc.guild.id] = queue
 
     # dispatch a subprocess that fetches the metadata
-    vc.loop.run_in_executor(utils.FUTURES_EXECUTOR, get_metadata, logger, url)
+    for url in urls:
+        vc.loop.run_in_executor(utils.FUTURES_EXECUTOR, get_metadata, logger, url)
 
     # If this is the only item, start playback
     if len(queue) == 1:
