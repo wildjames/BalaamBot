@@ -33,7 +33,7 @@ class SearchView(View):
         results: list[tuple[str, str, float]],
         *,
         queue_to_top: bool = False,
-    ):
+    ) -> None:
         """Set up the internal structures."""
         super().__init__(timeout=None)  # no timeout so buttons remain valid
         self.parent = parent
