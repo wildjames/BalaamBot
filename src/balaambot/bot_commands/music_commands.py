@@ -21,7 +21,11 @@ class SearchView(View):
     max_button_text_length = 80
 
     def __init__(
-        self, parent: "MusicCommands", results_list: list[tuple[str, str, float]]
+        self,
+        parent: "MusicCommands",
+        results_list: list[tuple[str, str, float]],
+        *,
+        queue_to_top: bool = False,
     ) -> None:
         """Set up the internal structures."""
         super().__init__(timeout=None)  # no timeout so buttons remain valid
@@ -45,11 +49,13 @@ class SearchView(View):
             )
 
             # Bind a callback that knows which index was clicked
-            button.callback = self.make_callback(idx, url, title)  # type: ignore The button is well defined
+            button.callback = self.make_callback(
+                idx, url, title, queue_to_top=queue_to_top
+            )  # type: ignore The button is well defined
             self.add_item(button)
 
     def make_callback(
-        self, idx: int, url: str, title: str
+        self, idx: int, url: str, title: str, *, queue_to_top: bool = False
     ) -> Callable[
         [discord.Interaction], Awaitable[InteractionCallbackResponse[Client] | None]
     ]:
@@ -70,7 +76,7 @@ class SearchView(View):
             await inner_interaction.response.edit_message(
                 content=f"Playing {title}", view=None, delete_after=5
             )
-            await self.parent.do_play(inner_interaction, url)
+            await self.parent.do_play(inner_interaction, url, queue_to_top=queue_to_top)
 
         return callback
 
@@ -190,12 +196,16 @@ class MusicCommands(commands.Cog):
                 ephemeral=True,
             )
             logger.warning(
-                "Received an empty query for play command in guild_id=%s",
+                "Play command received an empty query for play command in guild_id=%s",
                 interaction.guild_id,
             )
 
     async def do_search_youtube(
-        self, interaction: discord.Interaction, query: str
+        self,
+        interaction: discord.Interaction,
+        query: str,
+        *,
+        queue_to_top: bool = False,
     ) -> None:
         """Search for videos based on the query and display selection buttons."""
         # Check if the user is in a voice channel
@@ -218,12 +228,16 @@ class MusicCommands(commands.Cog):
         # Send the reply with the View
         await interaction.followup.send(
             content=description,
-            view=SearchView(self, results),
+            view=SearchView(self, results, queue_to_top=queue_to_top),
             ephemeral=True,
         )
 
     async def do_play_playlist(
-        self, interaction: discord.Interaction, playlist_url: str
+        self,
+        interaction: discord.Interaction,
+        playlist_url: str,
+        *,
+        queue_to_top: bool = False,
     ) -> None:
         """Handle enqueuing all videos from a YouTube playlist."""
         # Check if the user is in a voice channel
@@ -240,11 +254,12 @@ class MusicCommands(commands.Cog):
             )
 
         # Enqueue all tracks and start background fetches
-        for track_url in track_urls:
-            # These have to be awaited, to preserve order.
-            await yt_jobs.add_to_queue(
-                vc, track_url, text_channel=interaction.channel_id
-            )
+        await yt_jobs.add_to_queue(
+            vc,
+            track_urls,
+            text_channel=interaction.channel_id,
+            queue_to_top=queue_to_top,
+        )
 
         # Confirmation message
         await interaction.followup.send(
@@ -253,7 +268,9 @@ class MusicCommands(commands.Cog):
 
         return None
 
-    async def do_play(self, interaction: discord.Interaction, url: str) -> None:
+    async def do_play(
+        self, interaction: discord.Interaction, url: str, *, queue_to_top: bool = False
+    ) -> None:
         """Play a YouTube video by fetching and streaming the audio from the URL."""
         # Check if the user is in a voice channel
         vc_mixer = await discord_utils.get_voice_channel_mixer(interaction)
@@ -262,7 +279,9 @@ class MusicCommands(commands.Cog):
         vc, mixer = vc_mixer
 
         # Add to queue. Playback (in mixer) will await cache when it's time
-        await yt_jobs.add_to_queue(vc, url, text_channel=interaction.channel_id)
+        await yt_jobs.add_to_queue(
+            vc, [url], text_channel=interaction.channel_id, queue_to_top=queue_to_top
+        )
 
         track_meta = await yt_audio.get_youtube_track_metadata(url)
         if track_meta is None:
