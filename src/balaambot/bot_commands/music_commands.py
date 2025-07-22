@@ -204,7 +204,7 @@ class MusicCommands(commands.Cog):
 
         """
         await interaction.response.defer(thinking=True, ephemeral=True)
-        await self._enqueue(interaction, query, queue_to_top=False, command_name="play")
+        await self._enqueue(interaction, query, "play", queue_to_top=False)
 
     @app_commands.command(
         name="play_next", description="Queue a track to the top of the queue"
@@ -223,7 +223,7 @@ class MusicCommands(commands.Cog):
         """
         await interaction.response.defer(thinking=True, ephemeral=True)
         await self._enqueue(
-            interaction, query, queue_to_top=True, command_name="play_next"
+            interaction, query, "play_next", queue_to_top=True
         )
 
     async def do_search_youtube(
@@ -318,7 +318,10 @@ class MusicCommands(commands.Cog):
             return
 
         queue = await yt_jobs.list_queue(vc)
-        pos = queue.index(url) + 1
+        try:
+            pos = queue.index(url) + 1
+        except ValueError:
+            pos = -1
 
         runtime = track_meta["runtime_str"]
 

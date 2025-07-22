@@ -31,7 +31,7 @@ async def add_to_queue(
     *,
     queue_to_top: bool = False,
 ) -> None:
-    """Add a YouTube URL to the playback queue for the given voice client.
+    """Add YouTube URLs to the playback queue for the given voice client.
 
     If nothing is playing, start playback immediately.
     """
@@ -58,7 +58,8 @@ async def add_to_queue(
         )
 
     # re-add current track to top
-    queue.insert(0, current_track) if current_track else None
+    if current_track:
+        queue.insert(0, current_track)
 
     youtube_queue[vc.guild.id] = queue
 
