@@ -225,10 +225,13 @@ class MusicCommands(commands.Cog):
             If true, then the tracks will be added to the head of the queue.
 
         """
+        await interaction.response.defer(thinking=True, ephemeral=True)
         task = self.do_play_playlist(interaction, query, queue_to_top=queue_to_top)
-        task = self.bot.loop.create_task(task)
+
         try:
-            await task
+            logger.info("Adding playlist task to bot")
+            await self.bot.loop.create_task(task)
+            logger.info("DONE")
         except Exception as e:
             logger.exception(
                 "Error while processing play_list command for query '%s'",
