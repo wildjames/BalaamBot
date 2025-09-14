@@ -163,12 +163,12 @@ class MusicCommands(commands.Cog):
             )
             return
 
-        if yt_utils.is_valid_youtube_playlist(query):
-            logger.info("%s playlist URL: %s", command_name, query)
-            task = self.do_play_playlist(interaction, query, queue_to_top=queue_to_top)
-        elif yt_utils.is_valid_youtube_url(query):
+        if yt_utils.is_valid_youtube_url(query):
             logger.info("%s video URL: %s", command_name, query)
             task = self.do_play(interaction, query, queue_to_top=queue_to_top)
+        elif yt_utils.is_valid_youtube_playlist(query):
+            logger.info("%s playlist URL: %s", command_name, query)
+            task = self.do_play_playlist(interaction, query, queue_to_top=queue_to_top)
         else:
             logger.info("%s search query: %s", command_name, query)
             task = self.do_search_youtube(interaction, query, queue_to_top=queue_to_top)
