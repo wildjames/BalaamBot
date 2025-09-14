@@ -77,7 +77,7 @@ async def test_add_to_queue_first_item_schedules_playback(monkeypatch, dummy_log
         meta_called.append((ex, func, logger, url))
     vc.loop.run_in_executor = fake_run
 
-    await ytj.add_to_queue(vc, "yt://video1")
+    await ytj.add_to_queue(vc, ["yt://video1"])
 
     # queue updated
     assert ytj.youtube_queue[10] == ["yt://video1"]
@@ -99,7 +99,7 @@ async def test_add_to_queue_subsequent_items_do_not_schedule(monkeypatch, dummy_
     # first enqueue: schedule
     vc.loop.create_task = lambda c: asyncio.sleep(0)
     vc.loop.run_in_executor = lambda *args: None
-    await ytj.add_to_queue(vc, "first")
+    await ytj.add_to_queue(vc, ["first"])
 
     scheduled = False
     def fail_create_task(_):
@@ -107,7 +107,7 @@ async def test_add_to_queue_subsequent_items_do_not_schedule(monkeypatch, dummy_
         scheduled = True
     vc.loop.create_task = fail_create_task
     vc.loop.run_in_executor = lambda *args: None
-    await ytj.add_to_queue(vc, "second")
+    await ytj.add_to_queue(vc, ["second"])
 
     assert ytj.youtube_queue[11] == ["first", "second"]
     assert not scheduled
@@ -122,7 +122,7 @@ async def test_add_to_queue_create_task_fails_clears_queue(monkeypatch):
     vc.loop.run_in_executor = lambda *args: None
 
     with pytest.raises(RuntimeError):
-        await ytj.add_to_queue(vc, "failyt")
+        await ytj.add_to_queue(vc, ["failyt"])
     assert 12 not in ytj.youtube_queue
 
 
