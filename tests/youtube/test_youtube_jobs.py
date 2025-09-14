@@ -65,17 +65,18 @@ async def test_add_to_queue_first_item_schedules_playback(monkeypatch, dummy_log
     recorded = []
 
     # record create_task calls
+    orig_create = vc.loop.create_task
     def fake_create_task(coro):
         recorded.append(coro)
-        return asyncio.sleep(0)
-
-    vc.loop.create_task = fake_create_task
+        # Return a real Task so the loop remains healthy
+        return orig_create(coro)
+    monkeypatch.setattr(vc.loop, "create_task", fake_create_task, raising=False)
 
     # record prefetch metadata calls
     meta_called = []
     def fake_run(ex, func, logger, url):
         meta_called.append((ex, func, logger, url))
-    vc.loop.run_in_executor = fake_run
+    monkeypatch.setattr(vc.loop, "run_in_executor", fake_run, raising=False)
 
     await ytj.add_to_queue(vc, ["yt://video1"])
 
@@ -97,16 +98,19 @@ async def test_add_to_queue_first_item_schedules_playback(monkeypatch, dummy_log
 async def test_add_to_queue_subsequent_items_do_not_schedule(monkeypatch, dummy_logger):
     vc = DummyVC(11)
     # first enqueue: schedule
-    vc.loop.create_task = lambda c: asyncio.sleep(0)
-    vc.loop.run_in_executor = lambda *args: None
+    orig_create = vc.loop.create_task
+    monkeypatch.setattr(vc.loop, "create_task", lambda c: orig_create(c), raising=False)
+    monkeypatch.setattr(vc.loop, "run_in_executor", lambda *args: None, raising=False)
     await ytj.add_to_queue(vc, ["first"])
 
     scheduled = False
     def fail_create_task(_):
         nonlocal scheduled
         scheduled = True
-    vc.loop.create_task = fail_create_task
-    vc.loop.run_in_executor = lambda *args: None
+        return orig_create(asyncio.sleep(0))
+    monkeypatch.setattr(vc.loop, "create_task", fail_create_task, raising=False)
+    monkeypatch.setattr(vc.loop, "run_in_executor", lambda *args: None, raising=False)
+
     await ytj.add_to_queue(vc, ["second"])
 
     assert ytj.youtube_queue[11] == ["first", "second"]
@@ -118,10 +122,11 @@ async def test_add_to_queue_create_task_fails_clears_queue(monkeypatch):
     vc = DummyVC(12)
     def bad_create_task(_):
         raise RuntimeError("no loop")
-    vc.loop.create_task = bad_create_task
-    vc.loop.run_in_executor = lambda *args: None
 
     with pytest.raises(RuntimeError):
+        vc.loop.create_task = bad_create_task
+        vc.loop.run_in_executor = lambda *args: None
+
         await ytj.add_to_queue(vc, ["failyt"])
     assert 12 not in ytj.youtube_queue
 
