@@ -17,7 +17,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Python ${{ matrix.python-version }} with uv ${{ matrix.uv-version }}
         uses: ./.github/actions/setup-python-with-uv
@@ -38,7 +38,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Python ${{ matrix.python-version }} with uv ${{ matrix.uv-version }}
         uses: ./.github/actions/setup-python-with-uv
