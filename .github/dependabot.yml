@@ -14,3 +14,10 @@ updates:
       interval: daily
     commit-message:
       prefix: "chore(github-actions)"
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    commit-message:
+      prefix: "chore(docker)"
