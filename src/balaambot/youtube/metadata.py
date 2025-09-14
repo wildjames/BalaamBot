@@ -76,15 +76,18 @@ async def get_playlist_video_urls(playlist_url: str) -> list[str]:
         "quiet": True,
         "skip_download": True,
         "extract_flat": "in_playlist",
+        "playlistend": 40,
     }
     ydl_opts = add_auth_cookie(ydl_opts)
 
-    def _extract_playlist(opts: dict[str, Any], url: str) -> dict[str, Any] | None:
+    async def _extract_playlist(
+        opts: dict[str, Any], url: str
+    ) -> dict[str, Any] | None:
         with YoutubeDL(opts) as ydl:
             return ydl.extract_info(url, download=False)  # type: ignore[no-typing]
 
     try:
-        info = await asyncio.to_thread(_extract_playlist, ydl_opts, playlist_url)
+        info = await _extract_playlist(ydl_opts, playlist_url)
     except DownloadError as e:
         logger.warning(
             "yt-dlp failed to extract playlist info for %s: %s", playlist_url, e

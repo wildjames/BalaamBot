@@ -30,12 +30,18 @@ async def add_to_queue(
     text_channel: int | None = None,
     *,
     queue_to_top: bool = False,
-) -> None:
+) -> int:
     """Add YouTube URLs to the playback queue for the given voice client.
 
     If nothing is playing, start playback immediately.
+
+    Returns the queue position of the first URL added.
     """
     queue = youtube_queue.setdefault(vc.guild.id, [])
+
+    new_queue = False
+    if queue == []:
+        new_queue = True
 
     current_track = queue[0] if queue else None
 
@@ -68,7 +74,7 @@ async def add_to_queue(
         vc.loop.run_in_executor(utils.FUTURES_EXECUTOR, get_metadata, logger, url)
 
     # If this is the only item, start playback
-    if len(queue) == 1:
+    if new_queue:
         logger.info("Queue created for guild_id=%s, starting playback", vc.guild.id)
 
         # Start playback immediately
@@ -79,6 +85,10 @@ async def add_to_queue(
             # If we fail to start playback, we should clear the queue
             youtube_queue.pop(vc.guild.id, None)
             raise
+    else:
+        logger.info("Queue already existed. Not starting playback")
+
+    return queue.index(urls[0])
 
 
 async def _maybe_preload_next_tracks(

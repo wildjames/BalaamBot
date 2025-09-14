@@ -205,6 +205,16 @@ def is_valid_youtube_playlist(url: str) -> bool:
     return _VALID_YT_PLAYLIST_URL.match(url) is not None
 
 
+def get_playlist_id(url: str) -> str:
+    """Extract the playlist ID from the youtube URL."""
+    match = _VALID_YT_PLAYLIST_URL.match(url)
+    if match is not None:
+        return match.group("playlist_id")
+
+    msg = f"Failed to get playlist ID from url '{url}'"
+    raise ValueError(msg)
+
+
 def get_audio_pcm(
     url: str, sample_rate: int = DEFAULT_SAMPLE_RATE, channels: int = DEFAULT_CHANNELS
 ) -> bytearray | None:

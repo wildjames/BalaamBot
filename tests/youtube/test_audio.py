@@ -558,11 +558,17 @@ async def test_playlist_valid(monkeypatch):
     ]
     info = {"entries": entries}
 
-    # Stub thread call to return our info
-    async def fake_to_thread(func, opts, url):
-        return info
+    class DummyYDL:
+        def __enter__(self):
+            return self
 
-    monkeypatch.setattr(asyncio, "to_thread", fake_to_thread)
+        def __exit__(self, *args):
+            return False
+
+        def extract_info(self, u, download):
+            return info
+
+    monkeypatch.setattr(metadata, "YoutubeDL", lambda opts: DummyYDL())
     # Capture calls to extract_metadata
     called = []
     async def fake_extract(entry):
