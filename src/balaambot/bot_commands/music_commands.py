@@ -189,7 +189,10 @@ class MusicCommands(commands.Cog):
             return
 
     @app_commands.command(
-        name="play", description="Enqueue and play a YouTube video audio"
+        name="play",
+        description=(
+            "Enqueue and play a YouTube video audio (placed on the back of the queue)"
+        ),
     )
     @app_commands.describe(query="YouTube URL, playlist URL, or search term")
     async def play(self, interaction: discord.Interaction, query: str) -> None:
@@ -205,6 +208,37 @@ class MusicCommands(commands.Cog):
         """
         await interaction.response.defer(thinking=True, ephemeral=True)
         await self._enqueue(interaction, query, "play", queue_to_top=False)
+
+    @app_commands.command(name="play_list", description="queue up a whole playlist")
+    async def play_playlist(
+        self, interaction: discord.Interaction, query: str, *, queue_to_top: bool = True
+    ) -> None:
+        """Enqueue the playlist contained in a youtube URL.
+
+        Parameters
+        ----------
+        interaction : discord.Interaction
+            The interaction from Discord.
+        query : str
+            The YouTube URL, playlist URL, or search term to search and play.
+        queue_to_top : bool
+            If true, then the tracks will be added to the head of the queue.
+
+        """
+        task = self.do_play_playlist(interaction, query, queue_to_top=queue_to_top)
+        task = self.bot.loop.create_task(task)
+        try:
+            await task
+        except Exception as e:
+            logger.exception(
+                "Error while processing play_list command for query '%s'",
+                query,
+            )
+            await interaction.followup.send(
+                f"An error occurred while processing your play_list request: {e}",
+                ephemeral=True,
+            )
+            return
 
     @app_commands.command(
         name="play_next", description="Queue a track to the top of the queue"
@@ -295,34 +329,35 @@ class MusicCommands(commands.Cog):
     async def do_play(
         self, interaction: discord.Interaction, url: str, *, queue_to_top: bool = False
     ) -> None:
-        """Play a YouTube video by fetching and streaming the audio from the URL."""
+        """Play a YouTube video by fetching and streaming the audio from the URL.
+
+        The interaction passed in is assumed to have been deferred earlier.
+        """
         # Check if the user is in a voice channel
         vc_mixer = await discord_utils.get_voice_channel_mixer(interaction)
         if vc_mixer is None:
             return
         vc, mixer = vc_mixer
 
-        # Add to queue. Playback (in mixer) will await cache when it's time
-        await yt_jobs.add_to_queue(
+        track_id = yt_utils.get_video_id(url)
+        url = f"https://youtube.com/watch?v={track_id}"
+
+        track_meta = await yt_audio.get_youtube_track_metadata(url)
+        # Playback (in mixer) will await cache when it's time
+        pos = await yt_jobs.add_to_queue(
             vc, [url], text_channel=interaction.channel_id, queue_to_top=queue_to_top
         )
 
-        track_meta = await yt_audio.get_youtube_track_metadata(url)
         if track_meta is None:
+            # Remove the url from the queue
+            await yt_jobs.prune_queue(vc, index=pos)
             await interaction.followup.send(
                 f"Failed to fetch track metadata. Please check the URL. [{url}]",
                 ephemeral=True,
             )
             return
 
-        queue = await yt_jobs.list_queue(vc)
-        try:
-            pos = queue.index(url) + 1
-        except ValueError:
-            pos = -1
-
         runtime = track_meta["runtime_str"]
-
         msg = (
             f"🎵    Queued **[{track_meta['title']}]({track_meta['url']})"
             f" ({runtime})** at position {pos}."

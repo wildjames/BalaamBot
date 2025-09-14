@@ -30,10 +30,12 @@ async def add_to_queue(
     text_channel: int | None = None,
     *,
     queue_to_top: bool = False,
-) -> None:
+) -> int:
     """Add YouTube URLs to the playback queue for the given voice client.
 
     If nothing is playing, start playback immediately.
+
+    Returns the queue position of the first URL added.
     """
     queue = youtube_queue.setdefault(vc.guild.id, [])
 
@@ -79,6 +81,8 @@ async def add_to_queue(
             # If we fail to start playback, we should clear the queue
             youtube_queue.pop(vc.guild.id, None)
             raise
+
+    return queue.index(urls[0])
 
 
 async def _maybe_preload_next_tracks(
