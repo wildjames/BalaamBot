@@ -441,8 +441,8 @@ wheels = [
 
 [[package]]
 name = "discord-py"
-version = "2.6.0a5227+g7724764f"
-source = { git = "https://github.com/Rapptz/discord.py?rev=master#7724764ffebebf1584847b49ff6823f6c0402d01" }
+version = "2.7.0a5342+gbe3e3322"
+source = { git = "https://github.com/Rapptz/discord.py?rev=master#be3e3322514ca43c6e93a1f3128cef31275501bd" }
 dependencies = [
     { name = "aiohttp" },
     { name = "audioop-lts", marker = "python_full_version >= '3.13'" },
