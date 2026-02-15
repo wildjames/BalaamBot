@@ -18,9 +18,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG)
 
 
-async def fetch_audio(
-    test_url: str
-) -> None:
+async def fetch_audio(test_url: str) -> None:
     logger.info("Testing audio fetching for URL: %s", test_url)
     # Fetch and cache audio
     t0 = asyncio.get_event_loop().time()
@@ -77,6 +75,9 @@ if __name__ == "__main__":
 
     async def main() -> None:
         """Test the audio fetching and caching functionality."""
+        cookiefile = Path("persistent/cookies.txt")
+        config.COOKIE_FILE = cookiefile
+
         test_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 
         await fetch_audio(test_url)
@@ -93,8 +94,7 @@ if __name__ == "__main__":
         await search(test_search_query)
 
         age_restricted_url = "https://www.youtube.com/watch?v=wiRRsHPTSC8"
-        cookiefile = Path("persistent/cookies.txt")
-        config.COOKIE_FILE = cookiefile
+
         await fetch_audio(age_restricted_url)
         await load_cached_audio_pcm(age_restricted_url)
         await cleanup(age_restricted_url)

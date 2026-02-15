@@ -19,15 +19,19 @@ ENV UV_PYTHON_DOWNLOADS=0
 # Install packages needed for building the app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
+    curl=7.88.1-10+deb12u14 \
     git-svn=1:2.39.5-0+deb12u2 \
     # build-essential=12.9 \
     # ca-certificates=20230311 \
-    # curl=7.88.1-10+deb12u12 \
     # make=4.3-4.1 \
     unzip=6.0-28 \
     # To remove the image size, it is recommended refresh the package cache as follows
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+RUN curl -fsSL https://deno.land/install.sh -o /tmp/deno_install.sh \
+    && DENO_INSTALL=/usr/local sh /tmp/deno_install.sh -y \
+    && rm /tmp/deno_install.sh
 
 # Build the project in `/app`
 WORKDIR /app
@@ -73,6 +77,7 @@ COPY --from=builder --chown=app:app /app/sounds /app/sounds
 # Copy the app and pre-built venv from the builder - that should be all that's needed
 COPY --from=builder --chown=app:app /app/src /app/src
 COPY --from=builder --chown=app:app /app/.venv /app/.venv
+COPY --from=builder /usr/local/bin/deno /usr/local/bin/deno
 
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
