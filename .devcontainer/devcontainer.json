@@ -1,17 +1,17 @@
 {
     "name": "Balaam Bot",
     // Use the prebuilt image
-    "image": "wizenedchimp/balaambot-devcontainer:latest",
+    // "image": "wizenedchimp/balaambot-devcontainer:latest",
     // This is only needed if you want to build and test the devcontainer locally
-    // "build": {
-    //     "dockerfile": "Dockerfile",
-    //     "cacheFrom": "wizenedchimp/balaambot-devcontainer:latest",
-    //     "args": {
-    //         "UV_VERSION": "latest",
-    //         "DEBIAN_VERSION": "bookworm"
-    //         // Python version determined by .python-version file
-    //     }
-    // },
+    "build": {
+        "dockerfile": "Dockerfile",
+        "cacheFrom": "wizenedchimp/balaambot-devcontainer:latest",
+        "args": {
+            "UV_VERSION": "latest",
+            "DEBIAN_VERSION": "bookworm"
+            // Python version determined by .python-version file
+        }
+    },
     "mounts": [
         "source=${env:HOME}${env:USERPROFILE}/.ssh,target=/home/vscode/.ssh,type=bind"
     ],
