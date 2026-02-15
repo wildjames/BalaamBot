@@ -57,7 +57,7 @@ WORKDIR /app
 # Install packages needed for running the app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-    ffmpeg=7:7.1.3-0+deb13u1 \
+    ffmpeg=7:5.1.8-0+deb12u1 \
     libopus0=1.3.1-3 \
     # To remove the image size, it is recommended refresh the package cache as follows
     && apt-get clean \
