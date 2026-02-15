@@ -4,6 +4,7 @@ import subprocess
 from pathlib import Path
 from typing import Any, cast
 
+from anyio import Path as AnyioPath
 from yt_dlp import DownloadError, YoutubeDL
 
 from balaambot import utils
@@ -105,6 +106,9 @@ async def _convert_opus_to_pcm(
     channels: int,
 ) -> None:
     """Convert a downloaded opus file to PCM and move to cache."""
+    async_opus_tmp = AnyioPath(opus_tmp)
+    async_pcm_tmp = AnyioPath(pcm_tmp)
+
     cmd = [
         "ffmpeg",
         "-y",
@@ -126,13 +130,13 @@ async def _convert_opus_to_pcm(
         stderr=asyncio.subprocess.PIPE,
     )
     _out, err = await proc.communicate()
-    opus_tmp.unlink(missing_ok=True)
+    await async_opus_tmp.unlink(missing_ok=True)
     if proc.returncode != 0:
-        pcm_tmp.unlink(missing_ok=True)
+        await async_pcm_tmp.unlink(missing_ok=True)
         msg = f"ffmpeg failed: {err.decode(errors='ignore')}"
         raise RuntimeError(msg)
 
-    pcm_tmp.replace(cache_path)
+    await async_pcm_tmp.replace(cache_path)
 
 
 # === Synchronous wrappers used by worker threads ===

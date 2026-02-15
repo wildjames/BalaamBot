@@ -186,7 +186,7 @@ class CatCommands(commands.Cog):
             interaction.guild_id,
         )
         guild_id = 0 if interaction.guild_id is None else interaction.guild_id
-        success, message = self.cat_handler.remove_cat(
+        _success, message = self.cat_handler.remove_cat(
             cat, guild_id, interaction.user.id
         )
         await interaction.response.send_message(message)

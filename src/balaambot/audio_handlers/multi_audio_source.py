@@ -408,7 +408,8 @@ class MultiAudioSource(AudioSource):
         """
         logger.info("Playing file %s", filename)
 
-        if not Path(filename).is_file():
+        file_path = Path(filename)
+        if not await asyncio.to_thread(file_path.is_file):
             msg = f"{filename!r} does not exist"
             raise FileNotFoundError(msg)
 
