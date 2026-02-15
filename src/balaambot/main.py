@@ -56,7 +56,7 @@ def add_listeners() -> None:
     """Add listeners to the bot."""
     # This needs to be imported here, since it needs the logging and bot to be set up
     # before we can import and set up balaambot code.
-    from balaambot.discord_utils import on_voice_state_update
+    from balaambot.discord_utils import on_voice_state_update  # noqa: PLC0415 RUF100
 
     bot.add_listener(on_voice_state_update, "on_voice_state_update")
 

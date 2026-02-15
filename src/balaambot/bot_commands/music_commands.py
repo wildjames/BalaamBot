@@ -273,7 +273,6 @@ class MusicCommands(commands.Cog):
         vc_mixer = await discord_utils.get_voice_channel_mixer(interaction)
         if vc_mixer is None:
             return
-        vc, mixer = vc_mixer
 
         results = await yt_audio.search_youtube(query)
         # Each result is a tuple: (url, title, duration_in_seconds)
@@ -305,7 +304,7 @@ class MusicCommands(commands.Cog):
         vc_mixer = await discord_utils.get_voice_channel_mixer(interaction)
         if vc_mixer is None:
             return None
-        vc, mixer = vc_mixer
+        vc, _mixer = vc_mixer
 
         # Fetch playlist video URLs
         track_urls = await yt_audio.get_playlist_video_urls(playlist_url)
@@ -340,7 +339,7 @@ class MusicCommands(commands.Cog):
         vc_mixer = await discord_utils.get_voice_channel_mixer(interaction)
         if vc_mixer is None:
             return
-        vc, mixer = vc_mixer
+        vc, _mixer = vc_mixer
 
         track_id = yt_utils.get_video_id(url)
         url = f"https://youtube.com/watch?v={track_id}"
