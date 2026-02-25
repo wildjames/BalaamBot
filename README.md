@@ -55,6 +55,19 @@ Permissions:
 Privileged intents:
 - `Message Content Intent`
 
+## YouTube cookie export script
+
+If you need reusable YouTube session cookies (for example, local troubleshooting), use the Playwright helper script:
+
+```bash
+YOUTUBE_USERNAME="your-email@example.com" \
+YOUTUBE_PASSWORD="your-password" \
+YOUTUBE_COOKIES_PATH="./persistent" \
+uv run python save_youtube_cookies.py
+```
+
+`YOUTUBE_COOKIES_PATH` can be either a directory or full file path. If you pass a directory, the script writes `cookies.txt` in that directory.
+
 ## Tests
 Run the unit tests with:
 ```bash
