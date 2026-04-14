@@ -1,6 +1,7 @@
 ARG DEBIAN_VERSION=bookworm
 ARG UV_VERSION=0.7.12
 ARG PY_VERSION=3.13
+ARG DENO_VERSION=2.7.12
 
 FROM ghcr.io/astral-sh/uv:python${PY_VERSION}-${DEBIAN_VERSION}-slim AS builder
 
@@ -17,17 +18,28 @@ ENV UV_LINK_MODE=copy
 ENV UV_PYTHON_DOWNLOADS=0
 
 # Install packages needed for building the app
+# hadolint ignore=DL3008
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
     git-svn=1:2.39.5-0+deb12u2 \
     # build-essential=12.9 \
     # ca-certificates=20230311 \
-    # curl=7.88.1-10+deb12u12 \
+    curl \
     # make=4.3-4.1 \
     unzip=6.0-28 \
     # To remove the image size, it is recommended refresh the package cache as follows
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# Download deno (JS runtime required by yt-dlp for YouTube JS challenges)
+ARG DENO_VERSION
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+RUN ARCH=$(dpkg --print-architecture | sed 's/amd64/x86_64/;s/arm64/aarch64/') \
+    && curl -fsSL "https://github.com/denoland/deno/releases/download/v${DENO_VERSION}/deno-${ARCH}-unknown-linux-gnu.zip" -o /tmp/deno.zip \
+    && unzip /tmp/deno.zip -d /tmp/deno-bin \
+    && mv /tmp/deno-bin/deno /usr/local/bin/deno \
+    && chmod +x /usr/local/bin/deno \
+    && rm -rf /tmp/deno.zip /tmp/deno-bin
 
 # Build the project in `/app`
 WORKDIR /app
@@ -73,6 +85,9 @@ COPY --from=builder --chown=app:app /app/sounds /app/sounds
 # Copy the app and pre-built venv from the builder - that should be all that's needed
 COPY --from=builder --chown=app:app /app/src /app/src
 COPY --from=builder --chown=app:app /app/.venv /app/.venv
+
+# Copy the deno binary (JS runtime required by yt-dlp for YouTube JS challenges)
+COPY --from=builder /usr/local/bin/deno /usr/local/bin/deno
 
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
