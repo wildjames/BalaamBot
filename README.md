@@ -14,6 +14,7 @@ Balaam Bot mixes YouTube audio, sound effects and other fun features into a sing
 ## Requirements
 - Python 3.10+
 - `ffmpeg` installed and available in the `PATH`.
+- `deno` 2.0+ installed and available in the `PATH` (required for yt-dlp EJS JavaScript challenge solving).
 
 ## Quick start
 1. Clone the repository and install dependencies:
@@ -62,4 +63,8 @@ make test
 Use `make test-integration` to run the slower integration tests.
 
 For planned work see [TODO.md](TODO.md).
+
+## yt-dlp EJS challenge solver setup
+
+This project installs `yt-dlp` with the `default` dependency group (`yt-dlp[default]`), which includes the `yt-dlp-ejs` challenge solver scripts. Combined with the installed Deno runtime, yt-dlp can solve YouTube JavaScript challenges using the recommended runtime from the yt-dlp EJS guide.
 

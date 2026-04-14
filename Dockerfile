@@ -21,6 +21,7 @@ ENV UV_PYTHON_DOWNLOADS=0
 # hadolint ignore=DL3008
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
+    curl=7.88.1-10+deb12u14 \
     git-svn=1:2.39.5-0+deb12u2 \
     # build-essential=12.9 \
     # ca-certificates=20230311 \
@@ -85,6 +86,7 @@ COPY --from=builder --chown=app:app /app/sounds /app/sounds
 # Copy the app and pre-built venv from the builder - that should be all that's needed
 COPY --from=builder --chown=app:app /app/src /app/src
 COPY --from=builder --chown=app:app /app/.venv /app/.venv
+COPY --from=builder /usr/local/bin/deno /usr/local/bin/deno
 
 # Copy the deno binary (JS runtime required by yt-dlp for YouTube JS challenges)
 COPY --from=builder /usr/local/bin/deno /usr/local/bin/deno
