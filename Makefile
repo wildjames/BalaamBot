@@ -40,6 +40,7 @@ docker-run:
 	docker run --rm -it \
 		--env-file .env \
 		-v $(PWD)/persistent:/app/persistent \
+		-p 8080:8080 \
 		balaambot:latest
 
 docker-brun: docker-build docker-run

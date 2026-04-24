@@ -1,0 +1,22 @@
+{
+    "manifest_version": 3,
+    "name": "Cookie Exporter",
+    "version": "2.0.0",
+    "description": "Export all cookies in Netscape format - download locally or upload to a server",
+    "permissions": [
+        "cookies",
+        "downloads",
+        "storage"
+    ],
+    "host_permissions": [
+        "<all_urls>"
+    ],
+    "action": {
+        "default_popup": "popup.html",
+        "default_title": "Export Cookies"
+    },
+    "options_ui": {
+        "page": "options.html",
+        "open_in_tab": false
+    }
+}
