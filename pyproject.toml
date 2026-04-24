@@ -21,6 +21,9 @@ dependencies = [
     "pytest-asyncio>=1.0.0",
     "rapidfuzz>=3.13.0",
     "discord-py>=2.7.1",
+    "fastapi>=0.115.0",
+    "python-multipart>=0.0.20",
+    "uvicorn[standard]>=0.34.0",
 ]
 
 # Dev tools

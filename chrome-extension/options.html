@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cookie Exporter - Settings</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 480px;
+      margin: 24px auto;
+      padding: 0 16px;
+      font-size: 0.9rem;
+    }
+
+    h2 {
+      margin: 0 0 16px;
+      font-size: 1.1rem;
+    }
+
+    label {
+      display: block;
+      margin-top: 12px;
+      font-weight: 600;
+    }
+
+    input[type="text"],
+    input[type="password"],
+    input[type="url"] {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 6px 8px;
+      margin-top: 4px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 0.9rem;
+    }
+
+    .hint {
+      font-size: 0.78rem;
+      color: #666;
+      margin-top: 3px;
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+      align-items: center;
+    }
+
+    button {
+      padding: 8px 16px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      border: none;
+      border-radius: 4px;
+      background: #1a73e8;
+      color: #fff;
+    }
+
+    button:hover {
+      background: #1558b0;
+    }
+
+    #status {
+      font-size: 0.8rem;
+      color: #444;
+    }
+
+    #status.ok {
+      color: #188038;
+    }
+
+    #status.err {
+      color: #c5221f;
+    }
+  </style>
+</head>
+
+<body>
+  <h2>Cookie Exporter – Settings</h2>
+
+  <label for="serverUrl">Server URL</label>
+  <input type="url" id="serverUrl" placeholder="http://localhost:8080/cookies" />
+  <p class="hint">Full URL of the Balaam server <code>POST /cookies</code> endpoint.</p>
+
+  <label for="apiKey">API Key</label>
+  <input type="password" id="apiKey" placeholder="your-secret-key" autocomplete="off" />
+  <p class="hint">Bearer token configured as <code>COOKIE_SERVER_API_KEY</code> on the server.</p>
+
+  <div class="row">
+    <button id="saveBtn">Save</button>
+    <span id="status"></span>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+
+</html>

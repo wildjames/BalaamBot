@@ -7,6 +7,8 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 
+from balaambot.cookie_server import start_server
+
 load_dotenv()
 
 # Discord provides a nice default coloured log format
@@ -80,6 +82,14 @@ async def main() -> None:
         # Loads all files in bot_commands
         await load_extensions()
         add_listeners()
+
+        # Start the cookie upload API server concurrently.
+        # Hold a strong reference so the task is not garbage-collected.
+        _background_tasks: set[asyncio.Task] = set()
+        _api_task = asyncio.create_task(start_server(), name="cookie-upload-server")
+        _background_tasks.add(_api_task)
+        _api_task.add_done_callback(_background_tasks.discard)
+
         # Start the bot
         await bot.start(DISCORD_BOT_TOKEN)
 

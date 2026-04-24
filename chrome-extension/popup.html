@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cookie Exporter</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      min-width: 220px;
+      padding: 16px;
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 1rem;
+    }
+
+    button {
+      width: 100%;
+      padding: 8px 12px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      border: none;
+      border-radius: 4px;
+      background: #1a73e8;
+      color: #fff;
+    }
+
+    button:hover {
+      background: #1558b0;
+    }
+
+    #status {
+      margin-top: 10px;
+      font-size: 0.8rem;
+      color: #444;
+      min-height: 1.2em;
+    }
+  </style>
+</head>
+
+<body>
+  <h2>Cookie Exporter</h2>
+  <button id="exportBtn">Download cookies.txt</button>
+  <button id="uploadBtn" style="margin-top:8px;background:#188038;">Upload to server</button>
+  <div id="status"></div>
+  <a id="settingsLink" href="#"
+    style="display:block;margin-top:10px;font-size:0.78rem;color:#1a73e8;text-decoration:none;">&#9881; Settings</a>
+  <script src="popup.js"></script>
+</body>
+
+</html>
