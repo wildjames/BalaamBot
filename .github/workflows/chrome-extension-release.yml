@@ -45,4 +45,4 @@ jobs:
 
             See the [README](https://github.com/${{ github.repository }}/blob/main/chrome-extension/README.md) for full usage instructions.
           files: "cookie-exporter-v${{ steps.version.outputs.version }}.zip"
-          make_latest: false
+          make_latest: true
