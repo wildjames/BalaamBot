@@ -18,7 +18,7 @@ dependencies = [
     "pyjokes>=0.8.3",
     "pydantic>=2.13.4",
     "redis>=6.2.0",
-    "pytest-asyncio>=1.0.0",
+    "pytest-asyncio>=1.4.0",
     "rapidfuzz>=3.13.0",
     "discord-py>=2.7.1",
     "fastapi>=0.136.3",
@@ -34,7 +34,7 @@ dev = [
     "pre-commit>=4.6.0",
     "pyright>=1.1.409",
     "pytest>=8.3.4",
-    "pytest-asyncio>=1.0.0",
+    "pytest-asyncio>=1.4.0",
     "pytest-cov>=6.0.0",
     "ruff>=0.15.14",
 ]
