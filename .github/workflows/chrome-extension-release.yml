@@ -31,7 +31,7 @@ jobs:
             manifest.json popup.html popup.js options.html options.js README.md
 
       - name: Create or update GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: "Cookie Exporter v${{ steps.version.outputs.version }}"
