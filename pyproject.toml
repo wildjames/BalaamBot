@@ -21,7 +21,7 @@ dependencies = [
     "pytest-asyncio>=1.4.0",
     "rapidfuzz>=3.13.0",
     "discord-py>=2.7.1",
-    "fastapi>=0.139.0",
+    "fastapi>=0.140.9",
     "python-multipart>=0.0.32",
     "uvicorn[standard]>=0.51.0",
 ]
